@@ -249,6 +249,9 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 		}
 		s.mu.Lock()
 		if s.idleInstance.Len() > 0 {
+			go func() {
+				s.deleteSlot(ctx, request.RequestId, slot.Id, instanceId, request.MetaData.Key, "before initializing instance find idle instance")
+			}()
 			break
 		}
 		s.mu.Unlock()
