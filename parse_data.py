@@ -31,9 +31,15 @@ def parse_data(data):
     res = {}
     res["appCount"] = appCount
     interval = {}
+    duration_time = {}
     for key in start_time_interval:
-        interval[key] = sum(start_time_interval[key]) / len(start_time_interval[key])
+        try:
+            interval[key] = sum(start_time_interval[key]) / len(start_time_interval[key])
+            duration_time[key] = sum(start_time_interval[key])
+        except ZeroDivisionError:
+            continue
     res["start_time_interval"] = interval
+    res["duration_time"] = duration_time
     return res
 
 if __name__ == '__main__':
@@ -51,4 +57,10 @@ if __name__ == '__main__':
     # parse data
     res = parse_data(data)
     # print result
-    print(res)
+    print("app Number: ", len(res["appCount"]))
+    for key, value in res["appCount"].items():
+        if value > 500:
+            print("high frequency reques: ", key, " ", value)
+            print("average start time interval: ", res["start_time_interval"][key])
+            print("app duration time: ", res["duration_time"][key]/1000, "s")
+    # print(res)

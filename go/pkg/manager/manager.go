@@ -15,11 +15,14 @@ package manager
 
 import (
 	"fmt"
+
 	"github.com/AliyunContainerService/scaler/go/pkg/config"
 	"github.com/AliyunContainerService/scaler/go/pkg/model"
-	scaler2 "github.com/AliyunContainerService/scaler/go/pkg/scaler"
+
 	"log"
 	"sync"
+
+	scaler2 "github.com/AliyunContainerService/scaler/go/pkg/scaler"
 )
 
 type Manager struct {

@@ -20,16 +20,18 @@ import (
 )
 
 const (
+	// request cache size
+	REQUESTCACHESIZE = 100
 	// max idle instance number
 	MAXIDLEINSTANCE = 300000
 	// the number of request types that can be cached
-	THRESHOLDCACHE = 100
+	THRESHOLDCACHE = 80
 	// the number of request type's instance can be destroyed
-	THRESHOLDDESTROY = 10
+	THRESHOLDDESTROY = 5
 	// the number of instances that can be created in advance
-	PRECREATE = 10
+	PRECREATE = 15
 	// the number of request access to add
-	ACCESS_SCORE = 1
+	ACCESS_SCORE = 2
 	// the number of request access to subtract
 	SUBSCORE = 10
 	// the number of gcloop need waiting intervals to delete cache and wingman list
@@ -53,7 +55,7 @@ type Scheduler struct {
 	wg                   sync.WaitGroup
 	instances            map[string]*model.Instance
 	idleInstance         *list.List
-	requestCaches        [100]*RequestCache
+	requestCaches        [REQUESTCACHESIZE]*RequestCache
 	requestCachesWingman *list.List
 }
 
@@ -70,7 +72,7 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 		wg:                   sync.WaitGroup{},
 		instances:            make(map[string]*model.Instance),
 		idleInstance:         list.New(),
-		requestCaches:        [100]*RequestCache{},
+		requestCaches:        [REQUESTCACHESIZE]*RequestCache{},
 		requestCachesWingman: list.New(),
 	}
 	for i := 0; i < len(scheduler.requestCaches); i++ {
@@ -107,12 +109,14 @@ func (s *Scheduler) flushRequestCache(request *pb.AssignRequest) {
 			if requestCache.lifeTime < THRESHOLDCACHE {
 				return
 			}
+			// If the request type's life time is greater than THRESHOLDCACHE, we add it to cache array
+			s.requestCachesWingman.Remove(e)
 			var evict bool = true
 			for i := 0; i < len(s.requestCaches); i++ {
 				if s.requestCaches[i] == nil {
 					s.requestCaches[i] = requestCache
 					evict = false
-					s.requestCachesWingman.Remove(e)
+					log.Printf("request type: %s is added to cache list, life time is %d", requestType, requestCache.lifeTime)
 					break
 				}
 			}
@@ -129,6 +133,7 @@ func (s *Scheduler) flushRequestCache(request *pb.AssignRequest) {
 							s.requestCaches[j] = s.requestCaches[j-1]
 						}
 						s.requestCaches[i] = requestCache
+						log.Printf("request type: %s is added to cache list, life time is %d", requestType, requestCache.lifeTime)
 					}
 				}
 			}
@@ -173,8 +178,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 			}
 			slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
 			if err != nil {
-				errorMessage := fmt.Sprintf("Assign request id: %s, create slot error: %s", request.RequestId, err.Error())
-				log.Printf(errorMessage)
+				log.Printf("Assign request id: %s, init slot error: %s", request.RequestId, err.Error())
 				return
 			}
 			meta := &model.Meta{
@@ -186,8 +190,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 			}
 			instance, err := s.platformClient.Init(ctx, request.RequestId, uuid.New().String(), slot, meta)
 			if err != nil {
-				errorMessage := fmt.Sprintf("Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
-				log.Printf(errorMessage)
+				log.Printf("Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
 				return
 			}
 			s.mu.Lock()
@@ -221,7 +224,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	log.Printf("Assign request id: %s", request.RequestId)
 
 	s.mu.Lock()
-	for s.idleInstance.Len() == 0 {
+	if s.idleInstance.Len() == 0 {
 		s.mu.Unlock()
 		// create new instance
 		resourceConfig := &model.SlotResourceConfig{
@@ -231,7 +234,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 		}
 		s.mu.Lock()
 		if s.idleInstance.Len() > 0 {
-			break
+			goto use_idle_instance
 		}
 		s.mu.Unlock()
 		slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
@@ -252,7 +255,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 			go func() {
 				s.deleteSlot(ctx, request.RequestId, slot.Id, instanceId, request.MetaData.Key, "before initializing instance find idle instance")
 			}()
-			break
+			goto use_idle_instance
 		}
 		s.mu.Unlock()
 		instance, err := s.platformClient.Init(ctx, request.RequestId, instanceId, slot, meta)
@@ -280,6 +283,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 		}, nil
 	}
 
+use_idle_instance:
 	// reuse idle instance if idle instance is available
 	if s.idleInstance.Len() > 0 {
 		e := s.idleInstance.Front()
@@ -299,7 +303,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 			ErrorMessage: nil,
 		}, nil
 	}
-	s.mu.Unlock()
+	// s.mu.Unlock()
 
 	return nil, nil
 }
@@ -413,7 +417,7 @@ func (s *Scheduler) gcLoop() {
 			}
 			if element := s.idleInstance.Back(); element != nil {
 				instance := element.Value.(*model.Instance)
-				idleDuration := time.Now().Sub(instance.LastIdleTime)
+				idleDuration := time.Since(instance.LastIdleTime)
 				if idleDuration > s.config.IdleDurationBeforeGC {
 					// start to remove idle instance
 					s.idleInstance.Remove(element)
