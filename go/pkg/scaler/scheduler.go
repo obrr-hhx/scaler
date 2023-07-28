@@ -23,19 +23,23 @@ const (
 	// request cache size
 	REQUESTCACHESIZE = 100
 	// max idle instance number
-	MAXIDLEINSTANCE = 300000
+	MAXIDLEINSTANCE = 30000
+	MINIDLEINSTANCE = 1000
 	// the number of request types that can be cached
 	THRESHOLDCACHE = 80
 	// the number of request type's instance can be destroyed
 	THRESHOLDDESTROY = 5
 	// the number of instances that can be created in advance
-	PRECREATE = 15
+	PRECREATE = 150
 	// the number of request access to add
 	ACCESS_SCORE = 2
 	// the number of request access to subtract
 	SUBSCORE = 10
 	// the number of gcloop need waiting intervals to delete cache and wingman list
-	DELETECACHEINTERVALS = 2
+	DELETECACHEINTERVALS      = 2
+	DELETEWINGMANINTERVALS    = 40
+	CORELATIVEREQUESTINTERVAL = 100 * time.Millisecond
+	SPARSETIME                = 7654 * time.Millisecond
 )
 
 // store the request type and life time
@@ -47,16 +51,26 @@ type RequestCache struct {
 	lifeTime    int64
 }
 
+type CoRelateRequest struct {
+	preRequestType  string
+	nextRequestType string
+	interval        time.Duration
+}
+
 type Scheduler struct {
-	config               *config.Config
-	metaData             *model.Meta
-	platformClient       platform_client.Client
-	mu                   sync.Mutex
-	wg                   sync.WaitGroup
-	instances            map[string]*model.Instance
-	idleInstance         *list.List
-	requestCaches        [REQUESTCACHESIZE]*RequestCache
-	requestCachesWingman *list.List
+	config                *config.Config
+	metaData              *model.Meta
+	platformClient        platform_client.Client
+	mu                    sync.Mutex
+	wg                    sync.WaitGroup
+	instances             map[string]*model.Instance
+	idleInstance          *list.List
+	requestCaches         [REQUESTCACHESIZE]*RequestCache
+	requestCachesWingman  *list.List
+	lastAssignRequestTime time.Time
+	lastRequestType       string
+	requestTime           map[string]time.Time // some type request last access time
+	coRelateRequestList   *list.List
 }
 
 func New(metaData *model.Meta, config *config.Config) Scaler {
@@ -65,15 +79,19 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 		log.Fatalf("client init with error: %s", err.Error())
 	}
 	scheduler := &Scheduler{
-		config:               config,
-		metaData:             metaData,
-		platformClient:       client,
-		mu:                   sync.Mutex{},
-		wg:                   sync.WaitGroup{},
-		instances:            make(map[string]*model.Instance),
-		idleInstance:         list.New(),
-		requestCaches:        [REQUESTCACHESIZE]*RequestCache{},
-		requestCachesWingman: list.New(),
+		config:                config,
+		metaData:              metaData,
+		platformClient:        client,
+		mu:                    sync.Mutex{},
+		wg:                    sync.WaitGroup{},
+		instances:             make(map[string]*model.Instance),
+		idleInstance:          list.New(),
+		requestCaches:         [REQUESTCACHESIZE]*RequestCache{},
+		requestCachesWingman:  list.New(),
+		lastAssignRequestTime: time.Now(),
+		lastRequestType:       "",
+		requestTime:           make(map[string]time.Time),
+		coRelateRequestList:   list.New(),
 	}
 	for i := 0; i < len(scheduler.requestCaches); i++ {
 		scheduler.requestCaches[i] = nil
@@ -89,6 +107,8 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 }
 
 func (s *Scheduler) flushRequestCache(request *pb.AssignRequest) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	// If the request type is not in the wingman list, we add it to the wingman list.
 	// If the request type is in the wingman list, we add it's life time and add it to cache
 	requestType := request.MetaData.Key
@@ -152,7 +172,7 @@ func (s *Scheduler) flushRequestCache(request *pb.AssignRequest) {
  */
 func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.AssignRequest) {
 	s.mu.Lock()
-	ok := func() bool {
+	inCache := func() bool {
 		for i := 0; i < len(s.requestCaches); i++ {
 			if s.requestCaches[i] != nil && s.requestCaches[i].requestType == request.MetaData.Key {
 				return true
@@ -162,7 +182,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 	}()
 	s.mu.Unlock()
 
-	if !ok {
+	if !inCache {
 		return
 	}
 
@@ -202,19 +222,129 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 	}
 }
 
+func (s *Scheduler) readyForCoRequest(ctx context.Context, request *pb.AssignRequest, waitTime time.Duration) {
+	defer s.wg.Done()
+	// time.Sleep(waitTime - 60*time.Millisecond)
+	if waitTime < 60*time.Millisecond {
+		log.Printf("Ready for coRequest %s, interval time less initial time", request.RequestId)
+		return
+	}
+	time.Sleep(waitTime - 60*time.Millisecond)
+
+	resourceConfig := &model.SlotResourceConfig{
+		ResourceConfig: pb.ResourceConfig{
+			MemoryInMegabytes: request.MetaData.MemoryInMb,
+		},
+	}
+	slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
+	if err != nil {
+		log.Printf("Ready for coRequest id: %s, init slot error: %s", request.RequestId, err.Error())
+		return
+	}
+	meta := &model.Meta{
+		Meta: pb.Meta{
+			Key:           request.MetaData.Key,
+			Runtime:       request.MetaData.Runtime,
+			TimeoutInSecs: request.MetaData.TimeoutInSecs,
+		},
+	}
+	instance, err := s.platformClient.Init(ctx, request.RequestId, uuid.New().String(), slot, meta)
+	if err != nil {
+		log.Printf("Ready for coRequest id: %s, init instance error: %s", request.RequestId, err.Error())
+		return
+	}
+	s.mu.Lock()
+	s.instances[instance.Id] = instance
+	s.idleInstance.PushFront(instance)
+	s.mu.Unlock()
+	log.Printf("Ready for coRequest: %s, instance %s created for wait following app %s request, init latency: %dms", request.RequestId, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
+}
+
+func (s *Scheduler) buildCoRelatedRequest(request *pb.AssignRequest) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	lastRequestType := s.lastRequestType
+	lastRequestTime := s.requestTime[lastRequestType]
+	interval := time.Since(lastRequestTime)
+	// check if the current request type is in the co-related request list
+	var exist bool = false
+	for e := s.coRelateRequestList.Front(); e != nil; e = e.Next() {
+		if e.Value.(*CoRelateRequest).preRequestType == lastRequestType && e.Value.(*CoRelateRequest).nextRequestType == string(request.MetaData.Key) {
+			exist = true
+			lastInterval := e.Value.(*CoRelateRequest).interval
+			e.Value.(*CoRelateRequest).interval = (lastInterval + interval) / 2
+			break
+		}
+	}
+	if !exist {
+		s.coRelateRequestList.PushFront(&CoRelateRequest{
+			preRequestType:  lastRequestType,
+			nextRequestType: request.MetaData.Key,
+			interval:        interval,
+		})
+	}
+
+	defer func() {
+		s.lastRequestType = request.MetaData.Key
+		s.requestTime[request.MetaData.Key] = time.Now()
+	}()
+}
+
+func (s *Scheduler) doCoRequest(ctx context.Context, request *pb.AssignRequest) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	requestType := request.MetaData.Key
+	var cacheExist bool = false
+	var wingmanExist bool = false
+	// check if the last request is in the cache
+	for i := 0; i < len(s.requestCaches); i++ {
+		if s.requestCaches[i] != nil && s.requestCaches[i].requestType == requestType {
+			cacheExist = true
+			break
+		}
+	}
+
+	if !cacheExist {
+		return
+	}
+
+	for e := s.coRelateRequestList.Front(); e != nil; e = e.Next() {
+		if e.Value.(*CoRelateRequest).preRequestType == requestType {
+			coRequestType := e.Value.(*CoRelateRequest).nextRequestType
+			for e := s.requestCachesWingman.Front(); e != nil; e = e.Next() {
+				if e.Value.(*RequestCache).requestType == coRequestType {
+					wingmanExist = true
+					break
+				}
+			}
+			if !wingmanExist {
+				continue
+			}
+			s.wg.Add(1)
+			go s.readyForCoRequest(context.Background(), request, e.Value.(*CoRelateRequest).interval)
+		}
+	}
+
+}
+
 func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.AssignReply, error) {
 	start := time.Now()
 	instanceId := uuid.New().String()
 
 	s.mu.Lock()
-	s.flushRequestCache(request)
+	s.lastAssignRequestTime = time.Now()
 	s.mu.Unlock()
+
+	s.flushRequestCache(request)
+	s.buildCoRelatedRequest(request)
 
 	defer func() {
 		if s.idleInstance.Len() >= MAXIDLEINSTANCE {
 			return
 		}
 		s.waitFollowingRequest(ctx, request)
+		s.doCoRequest(ctx, request)
 	}()
 
 	defer func() {
@@ -271,6 +401,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 		s.instances[instance.Id] = instance
 		s.mu.Unlock()
 		log.Printf("Assign request id: %s, instance %s created for app %s, init latency: %dms", request.RequestId, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
+		log.Printf("Assign request id: %s, no idle instance", request.RequestId)
 
 		return &pb.AssignReply{
 			Status: pb.Status_Ok,
@@ -393,6 +524,10 @@ func (s *Scheduler) deleteCache() {
 			s.requestCaches[i] = nil
 		}
 	}
+
+}
+
+func (s *Scheduler) deleteWingman() {
 	for e := s.requestCachesWingman.Front(); e != nil; e = e.Next() {
 		requestCache := e.Value.(*RequestCache)
 		requestCache.lifeTime = requestCache.lifeTime - SUBSCORE
@@ -406,8 +541,10 @@ func (s *Scheduler) gcLoop() {
 	log.Printf("gc loop for app: %s is started", s.metaData.Key)
 	ticker := time.NewTicker(s.config.GcInterval)
 	var cacheCount int = 0
+	wingmanCount := 0
 	for range ticker.C {
 		cacheCount++
+		wingmanCount++
 		for {
 			s.mu.Lock()
 
@@ -415,6 +552,31 @@ func (s *Scheduler) gcLoop() {
 				cacheCount = 0
 				s.deleteCache()
 			}
+			if wingmanCount == DELETEWINGMANINTERVALS {
+				wingmanCount = 0
+				s.deleteWingman()
+			}
+
+			if s.idleInstance.Len() <= MINIDLEINSTANCE {
+				interval := time.Since(s.lastAssignRequestTime)
+				if interval > SPARSETIME {
+					// reclaim all idle instance
+					for element := s.idleInstance.Back(); element != nil; element = s.idleInstance.Back() {
+						instance := element.Value.(*model.Instance)
+						s.idleInstance.Remove(element)
+						delete(s.instances, instance.Id)
+						go func() {
+							ctx := context.Background()
+							ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+							defer cancel()
+							s.deleteSlot(ctx, uuid.NewString(), instance.Slot.Id, instance.Id, instance.Meta.Key, "idle instance because request is sparse")
+						}()
+					}
+
+				}
+				break
+			}
+
 			if element := s.idleInstance.Back(); element != nil {
 				instance := element.Value.(*model.Instance)
 				idleDuration := time.Since(instance.LastIdleTime)
