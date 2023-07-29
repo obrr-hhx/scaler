@@ -18,7 +18,7 @@ spec:
       - name: scaler
         #  需要替换为选手实现的scaler镜像地址
         #  registry.cn-beijing.aliyuncs.com/cloudnative-challenge/scaler:java-v1.0为java语言的demo镜像
-        image: registry-vpc.cn-beijing.aliyuncs.com/serverless-master/scaler:v2.0
+        image: registry-vpc.cn-beijing.aliyuncs.com/serverless-master/scaler:v3.1.1
         command: ["./run.sh"]
       - name: serverless-simulator
         image: registry-vpc.cn-beijing.aliyuncs.com/cloudnative-challenge/simulator:v1.3.3
