@@ -78,12 +78,49 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// set a expression to determine if the request type is bursty based on the request interval and request number
-	// the score of the result is higher if the request interval is shorter and the request number is larger
-	// if the score is higher than the threshold, we think the request type is bursty
+	if s.idleInstance.Len() > MAXIDLEINSTANCE {
+		// too many idle instances, we don't need to create new instances
+		return
+	}
+
 	busrty := false
 	if s.requestInterval < BUSRTYTIME && s.requestNum > THRESHOLD {
 		busrty = true
+	}
+	if !busrty && s.requestNum > THRESHOLD {
+		go func() {
+			// wait the interval time to new a instance
+			time.Sleep(s.requestInterval - 250*time.Millisecond)
+
+			resourceConfig := &model.SlotResourceConfig{
+				ResourceConfig: pb.ResourceConfig{
+					MemoryInMegabytes: request.MetaData.MemoryInMb,
+				},
+			}
+			slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
+			if err != nil {
+				log.Printf("[Sparse Bursty] Assign request id: %s, init slot error: %s", request.RequestId, err.Error())
+				return
+			}
+			meta := &model.Meta{
+				Meta: pb.Meta{
+					Key:           request.MetaData.Key,
+					Runtime:       request.MetaData.Runtime,
+					TimeoutInSecs: request.MetaData.TimeoutInSecs,
+				},
+			}
+			instance, err := s.platformClient.Init(ctx, request.RequestId, uuid.New().String(), slot, meta)
+			if err != nil {
+				log.Printf("[Sparse Bursty] Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
+				return
+			}
+			s.mu.Lock()
+			s.instances[instance.Id] = instance
+			s.idleInstance.PushFront(instance)
+			s.mu.Unlock()
+			log.Printf("[Sparse Bursty] Assign request id: %s, instance %s created for wait following app %s request, init latency: %dms", request.RequestId, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
+
+		}()
 	}
 
 	if !busrty {
@@ -91,10 +128,9 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 	}
 
 	// create some new instances to wait for the following requests and add them to idle instance list
+
 	for i := 0; i < PRECREATE; i++ {
-		s.wg.Add(1)
 		go func() {
-			defer s.wg.Done()
 			resourceConfig := &model.SlotResourceConfig{
 				ResourceConfig: pb.ResourceConfig{
 					MemoryInMegabytes: request.MetaData.MemoryInMb,
@@ -141,9 +177,6 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	s.mu.Unlock()
 
 	defer func() {
-		if s.idleInstance.Len() >= MAXIDLEINSTANCE {
-			return
-		}
 		s.waitFollowingRequest(ctx, request)
 	}()
 
@@ -182,7 +215,9 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 		}
 		s.mu.Lock()
 		if s.idleInstance.Len() > 0 {
+			s.wg.Add(1)
 			go func() {
+				defer s.wg.Done()
 				s.deleteSlot(ctx, request.RequestId, slot.Id, instanceId, request.MetaData.Key, "before initializing instance find idle instance")
 			}()
 			goto use_idle_instance
@@ -285,7 +320,7 @@ func (s *Scheduler) Idle(ctx context.Context, request *pb.IdleRequest) (*pb.Idle
 		return reply, nil
 	}
 
-	if instance.Busy == false {
+	if !instance.Busy {
 		log.Printf("request id %s instance %s is already freed", request.Assigment.RequestId, instanceId)
 		return reply, nil
 	}
