@@ -279,6 +279,12 @@ func (s *Scheduler) Idle(ctx context.Context, request *pb.IdleRequest) (*pb.Idle
 		return reply, nil
 	}
 
+	if s.idleInstance.Len() >= MAXIDLEINSTANCE {
+		log.Printf("request id %s, idle instances is up to max, destroy instance %s", request.Assigment.RequestId, instanceId)
+		needDestroy = true
+		return reply, nil
+	}
+
 	if instance.Busy == false {
 		log.Printf("request id %s instance %s is already freed", request.Assigment.RequestId, instanceId)
 		return reply, nil
