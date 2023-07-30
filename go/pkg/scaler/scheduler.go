@@ -181,11 +181,11 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	if s.requestNum == 0 {
 		s.lastRequestTime = request.Timestamp
 	} else {
-		s.requestNum++
 		interval := request.Timestamp - s.lastRequestTime
 		// calculate the average request interval
 		s.requestInterval = (s.requestInterval*(s.requestNum-1) + interval) / s.requestNum
 	}
+	s.requestNum++
 	s.mu.Unlock()
 
 	defer func() {
