@@ -91,7 +91,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 	}
 	if !busrty && s.requestNum > THRESHOLD {
 		if interval_ms <= INITTIME {
-			return // the request interval is too small, we don't need to create new instances
+			return // the request interval is too small, we cannot create new instances
 		}
 		go func() {
 			// wait the interval time to new a instance
@@ -360,13 +360,12 @@ func (s *Scheduler) gcLoop() {
 			if count == 5 {
 				count = 0
 				if s.requestNum == lastRequestNum && s.idleInstance.Len() > 0 {
-					log.Printf("request num is not changed, delete all idle instances")
 					for element := s.idleInstance.Back(); element != nil; element = s.idleInstance.Back() {
 						instance := element.Value.(*model.Instance)
 						s.idleInstance.Remove(element)
 						delete(s.instances, instance.Id)
 						go func() {
-							reason := fmt.Sprintf("idle duration %fs exceeds threshold %fs", time.Since(instance.LastIdleTime).Seconds(), REQUESTOLDTIMEOUT.Seconds())
+							reason := fmt.Sprintf("request type %s num is not changed, delete all idle instances", s.metaData.Key)
 							ctx := context.Background()
 							ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 							defer cancel()
