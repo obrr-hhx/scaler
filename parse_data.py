@@ -59,7 +59,7 @@ if __name__ == '__main__':
     # print result
     print("app Number: ", len(res["appCount"]))
     for key, value in res["appCount"].items():
-        if value > 500:
+        if value > 50:
             print("high frequency request: ", key, " ", value)
             print("average start time interval: ", res["start_time_interval"][key])
             print("app duration time: ", res["duration_time"][key]/1000, "s")
