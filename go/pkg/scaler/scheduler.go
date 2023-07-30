@@ -99,6 +99,8 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 			// wait the interval time to new a instance
 			time.Sleep(time.Duration(interval_ms-InitNum*2) * time.Millisecond)
 			sedoId := uuid.NewString()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(request.MetaData.TimeoutInSecs)*time.Second)
+			defer cancel()
 			resourceConfig := &model.SlotResourceConfig{
 				ResourceConfig: pb.ResourceConfig{
 					MemoryInMegabytes: request.MetaData.MemoryInMb,
@@ -141,6 +143,8 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 	for i := 0; i < PRECREATE; i++ {
 		go func() {
 			sedoId := uuid.NewString()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(request.MetaData.TimeoutInSecs)*time.Second)
+			defer cancel()
 			resourceConfig := &model.SlotResourceConfig{
 				ResourceConfig: pb.ResourceConfig{
 					MemoryInMegabytes: request.MetaData.MemoryInMb,
