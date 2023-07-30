@@ -24,5 +24,5 @@ type Config struct {
 var DefaultConfig = Config{
 	ClientAddr:           "127.0.0.1:50051",
 	GcInterval:           5000 * time.Millisecond,
-	IdleDurationBeforeGC: 20000 * time.Millisecond,
+	IdleDurationBeforeGC: 150000 * time.Millisecond,
 }

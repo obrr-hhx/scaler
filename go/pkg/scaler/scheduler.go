@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -22,15 +23,16 @@ const (
 	MAXIDLEINSTANCE = 30000 // max idle instance number
 	MINIDLEINSTANCE = 1000  // min idle instance number
 
-	THRESHOLD  = 500  // bursty threshold
-	BUSRTYTIME = 1500 // the interval time that the request type is bursty
+	THRESHOLD  = 50   // bursty threshold
+	BUSRTYTIME = 2000 // the interval time that the request type is bursty
 
-	PRECREATE = 150 // the number of instances that can be created in advance
+	PRECREATE = 15 // the number of instances that can be created in advance
 
 	REQUESTOLDTIMEOUT = 100 * time.Second // the timeout of the request that is too old
-
-	INITTIME = 16000 // the time of initialization for each instance
 )
+
+var InitTime uint64 = 16000 // the time of initialization for each instance
+var InitNum uint64 = 0
 
 type Scheduler struct {
 	config          *config.Config
@@ -90,12 +92,12 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 		busrty = true
 	}
 	if !busrty && s.requestNum > THRESHOLD {
-		if interval_ms <= INITTIME {
+		if interval_ms <= InitTime*2 {
 			return // the request interval is too small, we cannot create new instances
 		}
 		go func() {
 			// wait the interval time to new a instance
-			time.Sleep(time.Duration(interval_ms-INITTIME) / time.Millisecond)
+			time.Sleep(time.Duration(interval_ms-InitNum*2) * time.Millisecond)
 
 			resourceConfig := &model.SlotResourceConfig{
 				ResourceConfig: pb.ResourceConfig{
@@ -115,6 +117,8 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 				},
 			}
 			instance, err := s.platformClient.Init(ctx, request.RequestId, uuid.New().String(), slot, meta)
+			InitNum++
+			InitTime = (InitTime*(InitNum-1) + uint64(instance.InitDurationInMs)) / InitNum
 			if err != nil {
 				log.Printf("[Sparse Bursty] Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
 				return
@@ -154,6 +158,8 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 				},
 			}
 			instance, err := s.platformClient.Init(ctx, request.RequestId, uuid.New().String(), slot, meta)
+			InitNum++
+			InitTime = (InitTime*(InitNum-1) + uint64(instance.InitDurationInMs)) / InitNum
 			if err != nil {
 				log.Printf("[Bursty] Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
 				return
@@ -162,7 +168,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 			s.instances[instance.Id] = instance
 			s.idleInstance.PushFront(instance)
 			s.mu.Unlock()
-			log.Printf("[Bursty] Assign request id: %s, instance %s created for wait following app %s request, init latency: %dms", request.RequestId, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
+			log.Printf("[Bursty] Assign request app %s, instance %s created for wait following , init latency: %dms", request.MetaData.Key, instance.Id, instance.InitDurationInMs)
 		}()
 	}
 }
@@ -183,7 +189,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	s.mu.Unlock()
 
 	defer func() {
-		s.waitFollowingRequest(ctx, request)
+		go s.waitFollowingRequest(ctx, request)
 	}()
 
 	defer func() {
@@ -230,6 +236,8 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 		}
 		s.mu.Unlock()
 		instance, err := s.platformClient.Init(ctx, request.RequestId, instanceId, slot, meta)
+		InitNum++
+		InitTime = (InitTime*(InitNum-1) + uint64(instance.InitDurationInMs)) / InitNum
 		if err != nil {
 			errorMessage := fmt.Sprintf("Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
 			log.Printf(errorMessage)
@@ -241,7 +249,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 		instance.Busy = true
 		s.instances[instance.Id] = instance
 		s.mu.Unlock()
-		log.Printf("[No Idle Instance] Assign request id: %s, request interval: %dms, instance %s created for app %s, init latency: %dms", request.RequestId, s.requestInterval, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
+		log.Printf("[No Idle Instance] Assign request id: %s, request interval: %dms Num: %d, instance %s created for app %s, init latency: %dms", request.RequestId, s.requestInterval, s.requestNum, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
 
 		return &pb.AssignReply{
 			Status: pb.Status_Ok,
@@ -263,7 +271,7 @@ use_idle_instance:
 		instanceId = instance.Id
 		s.idleInstance.Remove(e)
 		s.mu.Unlock()
-		log.Printf("[Idle Instance] Assign request id: %s, instance %s reused", request.RequestId, instanceId)
+		log.Printf("[Idle Instance] Assign request id: %s, type: %s, request interval: %dms Num: %d, instance %s reused", request.RequestId, s.metaData.Key, s.requestInterval, s.requestNum, instanceId)
 		return &pb.AssignReply{
 			Status: pb.Status_Ok,
 			Assigment: &pb.Assignment{
@@ -290,7 +298,7 @@ func (s *Scheduler) Idle(ctx context.Context, request *pb.IdleRequest) (*pb.Idle
 	start := time.Now()
 	instanceId := request.Assigment.InstanceId
 	defer func() {
-		log.Printf("Idle request id: %s, instance id: %s, cost: %dus", request.Assigment.RequestId, instanceId, time.Since(start).Microseconds())
+		log.Printf("Idle request id: %s, type: %s, instance id: %s, cost: %dus, now idle instance num: %d", request.Assigment.RequestId, s.metaData.Key, instanceId, time.Since(start).Microseconds(), s.idleInstance.Len())
 	}()
 	needDestroy := false
 	slotId := ""
@@ -302,7 +310,7 @@ func (s *Scheduler) Idle(ctx context.Context, request *pb.IdleRequest) (*pb.Idle
 			s.deleteSlot(ctx, request.Assigment.RequestId, slotId, instanceId, request.Assigment.MetaKey, "bad instance")
 		}
 	}()
-	log.Printf("Idle request id:%s", request.Assigment.RequestId)
+	// log.Printf("Idle request id:%s", request.Assigment.RequestId)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -331,7 +339,6 @@ func (s *Scheduler) Idle(ctx context.Context, request *pb.IdleRequest) (*pb.Idle
 	}
 	instance.Busy = false
 	s.idleInstance.PushFront(instance)
-	log.Printf("Idle instance num: %d", s.idleInstance.Len())
 	return reply, nil
 }
 
@@ -357,20 +364,31 @@ func (s *Scheduler) gcLoop() {
 		for {
 			s.mu.Lock()
 			// check if last request is too old delete all idle instances
-			if count == 5 {
+			if count == 20 {
 				count = 0
+				// set a random number between 1 and idleInstance.Len() as the number of idle instances to be deleted
+				var num int
+				if s.idleInstance.Len() > 0 {
+					// set random seed
+					rand.Seed(time.Now().UnixNano())
+					num = rand.Intn(s.idleInstance.Len()) + 1
+				}
 				if s.requestNum == lastRequestNum && s.idleInstance.Len() > 0 {
+					reason := fmt.Sprintf("request type %s num is not changed, delete %d idle instances", s.metaData.Key, num)
 					for element := s.idleInstance.Back(); element != nil; element = s.idleInstance.Back() {
+						if num == 0 {
+							break
+						}
 						instance := element.Value.(*model.Instance)
 						s.idleInstance.Remove(element)
 						delete(s.instances, instance.Id)
 						go func() {
-							reason := fmt.Sprintf("request type %s num is not changed, delete all idle instances", s.metaData.Key)
 							ctx := context.Background()
 							ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 							defer cancel()
 							s.deleteSlot(ctx, uuid.NewString(), instance.Slot.Id, instance.Id, instance.Meta.Key, reason)
 						}()
+						num--
 					}
 					break
 				}
