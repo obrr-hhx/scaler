@@ -187,7 +187,6 @@ func (s *Scheduler) idleUse(request *pb.AssignRequest) (*pb.AssignReply, error) 
 		instance := element.Value.(*model.Instance)
 		instance.Busy = true
 		s.idleInstance.Remove(element)
-		s.mu.Unlock()
 		log.Printf("Assign, request id: %s, instance %s reused", request.RequestId, instance.Id)
 		instanceId := instance.Id
 		return &pb.AssignReply{
@@ -275,6 +274,8 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 		s.wg.Add(1)
 		go func() {
 			defer s.wg.Done()
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+			defer cancel()
 			s.deleteSlot(ctx, request.RequestId, slot.Id, instanceId, request.MetaData.Key, "before initializing instance find idle instance")
 		}()
 		replyIdle, err := s.idleUse(request)
