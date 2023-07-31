@@ -43,6 +43,7 @@ type Scheduler struct {
 	wg              sync.WaitGroup
 	instances       map[string]*model.Instance
 	idleInstance    *list.List
+	idleSlot        *list.List
 	lastRequestTime uint64
 	requestInterval uint64
 	requestNum      uint64
@@ -61,6 +62,7 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 		wg:              sync.WaitGroup{},
 		instances:       make(map[string]*model.Instance),
 		idleInstance:    list.New(),
+		idleSlot:        list.New(),
 		lastRequestTime: 0,
 		requestInterval: 0,
 		requestNum:      0,
@@ -187,7 +189,7 @@ func (s *Scheduler) idleUse(request *pb.AssignRequest) (*pb.AssignReply, error) 
 		instance := element.Value.(*model.Instance)
 		instance.Busy = true
 		s.idleInstance.Remove(element)
-		log.Printf("Assign, request id: %s, instance %s reused", request.RequestId, instance.Id)
+		log.Printf("[Idle Instance] Assign, request id: %s, type %s, instance %s reused, request interval %dms, num %d", request.RequestId, request.MetaData.Key, instance.Id, s.requestInterval, s.requestNum)
 		instanceId := instance.Id
 		return &pb.AssignReply{
 			Status: pb.Status_Ok,
@@ -230,14 +232,6 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 
 	log.Printf("Assign request id: %s", request.RequestId)
 
-	s.mu.Lock()
-	replyIdle, err := s.idleUse(request)
-	if err == nil {
-		idle_use = true
-		return replyIdle, err
-	}
-	s.mu.Unlock()
-
 	resourceConfig := &model.SlotResourceConfig{
 		ResourceConfig: pb.ResourceConfig{
 			MemoryInMegabytes: request.MetaData.MemoryInMb,
@@ -250,42 +244,45 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 			TimeoutInSecs: request.MetaData.TimeoutInSecs,
 		},
 	}
+
+	// use idle instance if have idle instance
 	s.mu.Lock()
-	if s.idleInstance.Len() > 0 {
-		replyIdle, err := s.idleUse(request)
-		if err == nil {
-			idle_use = true
-			s.mu.Unlock()
-			return replyIdle, err
-		}
+	if replyIdle, err := s.idleUse(request); err == nil {
+		idle_use = true
+		return replyIdle, err
 	}
 	s.mu.Unlock()
 
-	// create new instance
-	slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
-	if err != nil {
-		errorMessage := fmt.Sprintf("Assign request id: %s, create slot error: %s", request.RequestId, err.Error())
-		log.Printf(errorMessage)
-		return nil, status.Error(codes.Internal, errorMessage)
-	}
-
 	s.mu.Lock()
-	if s.idleInstance.Len() > 0 {
-		s.wg.Add(1)
-		go func() {
-			defer s.wg.Done()
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-			defer cancel()
-			s.deleteSlot(ctx, request.RequestId, slot.Id, instanceId, request.MetaData.Key, "before initializing instance find idle instance")
-		}()
-		replyIdle, err := s.idleUse(request)
-		if err == nil {
-			idle_use = true
-			s.mu.Unlock()
-			return replyIdle, err
+	var slot *model.Slot
+	if is := s.idleSlot.Front(); is != nil {
+		// use idle slot
+		slot = is.Value.(*model.Slot)
+		s.idleSlot.Remove(is)
+		s.mu.Unlock()
+	} else {
+		s.mu.Unlock()
+		// create new slot
+		var err error
+		slot, err = s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
+		if err != nil {
+			errorMessage := fmt.Sprintf("Assign request id: %s, create slot error: %s", request.RequestId, err.Error())
+			log.Printf(errorMessage)
+			return nil, status.Error(codes.Internal, errorMessage)
 		}
+
+		s.mu.Lock()
+		if s.idleInstance.Len() > 0 {
+			s.idleSlot.PushFront(slot)
+			log.Printf("Assign request id: %s, type %s, back slot %s, idle slot num: %d", request.RequestId, request.MetaData.Key, slot.Id, s.idleSlot.Len())
+			if replyIdle, err := s.idleUse(request); err == nil {
+				idle_use = true
+				s.mu.Unlock()
+				return replyIdle, err
+			}
+		}
+		s.mu.Unlock()
 	}
-	s.mu.Unlock()
 
 	instance, err := s.platformClient.Init(ctx, request.RequestId, instanceId, slot, meta)
 	if err != nil {
