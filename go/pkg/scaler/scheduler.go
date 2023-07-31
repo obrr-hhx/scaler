@@ -81,6 +81,11 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.AssignRequest) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.idleInstance.Len() > MAXIDLEINSTANCE {
+		return
+	}
+
 	interval_ms := s.requestInterval
 	if s.idleInstance.Len() > MAXIDLEINSTANCE {
 		// too many idle instances, we don't need to create new instances
@@ -129,7 +134,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 			s.instances[instance.Id] = instance
 			s.idleInstance.PushFront(instance)
 			s.mu.Unlock()
-			log.Printf("[Sparse Bursty] Assign request id: %s, instance %s created for wait following app %s request, init latency: %dms", sedoId, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
+			log.Printf("[Sparse Bursty] Assign request id: %s, instance %s created for wait following app %s request, init latency: %dms, idle instances num: %d", sedoId, instance.Id, request.MetaData.Key, instance.InitDurationInMs, s.idleInstance.Len())
 
 		}()
 	}
@@ -173,7 +178,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 			s.instances[instance.Id] = instance
 			s.idleInstance.PushFront(instance)
 			s.mu.Unlock()
-			log.Printf("[Bursty] Assign request app %s, instance %s created for wait following , init latency: %dms", request.MetaData.Key, instance.Id, instance.InitDurationInMs)
+			log.Printf("[Bursty] Assign request app %s, instance %s created for wait following , init latency: %dms, idle instances num: %d", request.MetaData.Key, instance.Id, instance.InitDurationInMs, s.idleInstance.Len())
 		}()
 	}
 }
@@ -181,6 +186,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.AssignReply, error) {
 	start := time.Now()
 	instanceId := uuid.New().String()
+	idle_use := false
 
 	s.mu.Lock()
 	if s.requestNum == 0 {
@@ -194,6 +200,9 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	s.mu.Unlock()
 
 	defer func() {
+		if !idle_use {
+			return
+		}
 		go s.waitFollowingRequest(ctx, request)
 	}()
 
@@ -270,6 +279,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 use_idle_instance:
 	// reuse idle instance if idle instance is available
 	if s.idleInstance.Len() > 0 {
+		idle_use = true
 		e := s.idleInstance.Front()
 		instance := e.Value.(*model.Instance)
 		instance.Busy = true
@@ -369,16 +379,19 @@ func (s *Scheduler) gcLoop() {
 		for {
 			s.mu.Lock()
 			// check if last request is too old delete all idle instances
-			if count == 20 {
+			if count == 10 {
 				count = 0
 				// set a random number between 1 and idleInstance.Len() as the number of idle instances to be deleted
-				var num int
+				var num int = s.idleInstance.Len()
 				if s.idleInstance.Len() > 0 {
-					// set random seed
-					rand.Seed(time.Now().UnixNano())
-					num = rand.Intn(s.idleInstance.Len()) + 1
+					// cannot make num equal to idleInstance.Len(), do not delete all idle instances
+					for num == s.idleInstance.Len() {
+						// set random seed
+						rand.Seed(time.Now().UnixNano())
+						num = rand.Intn(s.idleInstance.Len()) + 1
+					}
 				}
-				if s.requestNum == lastRequestNum && s.idleInstance.Len() > 0 {
+				if s.requestNum == lastRequestNum && s.idleInstance.Len() > 0 && num != s.idleInstance.Len() {
 					reason := fmt.Sprintf("request type %s num is not changed, delete %d idle instances", s.metaData.Key, num)
 					for element := s.idleInstance.Back(); element != nil; element = s.idleInstance.Back() {
 						if num == 0 {
