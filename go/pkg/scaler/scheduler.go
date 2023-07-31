@@ -3,6 +3,7 @@ package scaler
 import (
 	"container/list"
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -23,7 +24,7 @@ const (
 	MAXIDLEINSTANCE = 30000 // max idle instance number
 	MINIDLEINSTANCE = 1000  // min idle instance number
 
-	THRESHOLD  = 50   // bursty threshold
+	THRESHOLD  = 25   // bursty threshold
 	BUSRTYTIME = 2000 // the interval time that the request type is bursty
 
 	PRECREATE = 15 // the number of instances that can be created in advance
@@ -103,7 +104,6 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 		go func() {
 			// wait the interval time to new a instance
 			time.Sleep(time.Duration(interval_ms-InitNum*2) * time.Millisecond)
-			sedoId := uuid.NewString()
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(request.MetaData.TimeoutInSecs)*time.Second)
 			defer cancel()
 			resourceConfig := &model.SlotResourceConfig{
@@ -111,9 +111,9 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 					MemoryInMegabytes: request.MetaData.MemoryInMb,
 				},
 			}
-			slot, err := s.platformClient.CreateSlot(ctx, sedoId, resourceConfig)
+			slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
 			if err != nil {
-				log.Printf("[Sparse Bursty] Assign request id: %s, init slot error: %s", sedoId, err.Error())
+				log.Printf("[Sparse Bursty] Assign request id: %s, init slot error: %s", request.RequestId, err.Error())
 				return
 			}
 			meta := &model.Meta{
@@ -123,18 +123,18 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 					TimeoutInSecs: request.MetaData.TimeoutInSecs,
 				},
 			}
-			instance, err := s.platformClient.Init(ctx, sedoId, uuid.New().String(), slot, meta)
+			instance, err := s.platformClient.Init(ctx, request.RequestId, uuid.New().String(), slot, meta)
 			InitNum++
 			InitTime = (InitTime*(InitNum-1) + uint64(instance.InitDurationInMs)) / InitNum
 			if err != nil {
-				log.Printf("[Sparse Bursty] Assign request id: %s, init instance error: %s", sedoId, err.Error())
+				log.Printf("[Sparse Bursty] Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
 				return
 			}
 			s.mu.Lock()
 			s.instances[instance.Id] = instance
 			s.idleInstance.PushFront(instance)
 			s.mu.Unlock()
-			log.Printf("[Sparse Bursty] Assign request id: %s, instance %s created for wait following app %s request, init latency: %dms, idle instances num: %d", sedoId, instance.Id, request.MetaData.Key, instance.InitDurationInMs, s.idleInstance.Len())
+			log.Printf("[Sparse Bursty] Assign request id: %s, instance %s created for wait following app %s request, init latency: %dms, idle instances num: %d", request.RequestId, instance.Id, request.MetaData.Key, instance.InitDurationInMs, s.idleInstance.Len())
 
 		}()
 	}
@@ -147,7 +147,6 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 
 	for i := 0; i < PRECREATE; i++ {
 		go func() {
-			sedoId := uuid.NewString()
 			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(request.MetaData.TimeoutInSecs)*time.Second)
 			defer cancel()
 			resourceConfig := &model.SlotResourceConfig{
@@ -155,9 +154,9 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 					MemoryInMegabytes: request.MetaData.MemoryInMb,
 				},
 			}
-			slot, err := s.platformClient.CreateSlot(ctx, sedoId, resourceConfig)
+			slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
 			if err != nil {
-				log.Printf("[Bursty] Assign request id: %s, init slot error: %s", sedoId, err.Error())
+				log.Printf("[Bursty] Assign request id: %s, init slot error: %s", request.RequestId, err.Error())
 				return
 			}
 			meta := &model.Meta{
@@ -167,27 +166,47 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 					TimeoutInSecs: request.MetaData.TimeoutInSecs,
 				},
 			}
-			instance, err := s.platformClient.Init(ctx, sedoId, uuid.New().String(), slot, meta)
+			instance, err := s.platformClient.Init(ctx, request.RequestId, uuid.New().String(), slot, meta)
 			InitNum++
 			InitTime = (InitTime*(InitNum-1) + uint64(instance.InitDurationInMs)) / InitNum
 			if err != nil {
-				log.Printf("[Bursty] Assign request id: %s, init instance error: %s", sedoId, err.Error())
+				log.Printf("[Bursty] Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
 				return
 			}
 			s.mu.Lock()
 			s.instances[instance.Id] = instance
 			s.idleInstance.PushFront(instance)
 			s.mu.Unlock()
-			log.Printf("[Bursty] Assign request app %s, instance %s created for wait following , init latency: %dms, idle instances num: %d", request.MetaData.Key, instance.Id, instance.InitDurationInMs, s.idleInstance.Len())
+			log.Printf("[Bursty] Assign request id %s app %s, instance %s created for wait following , init latency: %dms, idle instances num: %d", request.RequestId, request.MetaData.Key, instance.Id, instance.InitDurationInMs, s.idleInstance.Len())
 		}()
 	}
+}
+
+func (s *Scheduler) idleUse(request *pb.AssignRequest) (*pb.AssignReply, error) {
+	if element := s.idleInstance.Front(); element != nil {
+		instance := element.Value.(*model.Instance)
+		instance.Busy = true
+		s.idleInstance.Remove(element)
+		s.mu.Unlock()
+		log.Printf("Assign, request id: %s, instance %s reused", request.RequestId, instance.Id)
+		instanceId := instance.Id
+		return &pb.AssignReply{
+			Status: pb.Status_Ok,
+			Assigment: &pb.Assignment{
+				RequestId:  request.RequestId,
+				MetaKey:    instance.Meta.Key,
+				InstanceId: instanceId,
+			},
+			ErrorMessage: nil,
+		}, nil
+	}
+	return nil, errors.New("no idle instance")
 }
 
 func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.AssignReply, error) {
 	start := time.Now()
 	instanceId := uuid.New().String()
 	idle_use := false
-
 	s.mu.Lock()
 	if s.requestNum == 0 {
 		s.lastRequestTime = request.Timestamp
@@ -213,93 +232,87 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	log.Printf("Assign request id: %s", request.RequestId)
 
 	s.mu.Lock()
-	if s.idleInstance.Len() == 0 {
-		s.mu.Unlock()
-		// create new instance
-		resourceConfig := &model.SlotResourceConfig{
-			ResourceConfig: pb.ResourceConfig{
-				MemoryInMegabytes: request.MetaData.MemoryInMb,
-			},
-		}
-		s.mu.Lock()
-		if s.idleInstance.Len() > 0 {
-			goto use_idle_instance
-		}
-		s.mu.Unlock()
-		slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
-		if err != nil {
-			errorMessage := fmt.Sprintf("Assign request id: %s, create slot error: %s", request.RequestId, err.Error())
-			log.Printf(errorMessage)
-			return nil, status.Error(codes.Internal, errorMessage)
-		}
-		meta := &model.Meta{
-			Meta: pb.Meta{
-				Key:           request.MetaData.Key,
-				Runtime:       request.MetaData.Runtime,
-				TimeoutInSecs: request.MetaData.TimeoutInSecs,
-			},
-		}
-		s.mu.Lock()
-		if s.idleInstance.Len() > 0 {
-			s.wg.Add(1)
-			go func() {
-				defer s.wg.Done()
-				s.deleteSlot(ctx, request.RequestId, slot.Id, instanceId, request.MetaData.Key, "before initializing instance find idle instance")
-			}()
-			goto use_idle_instance
-		}
-		s.mu.Unlock()
-		instance, err := s.platformClient.Init(ctx, request.RequestId, instanceId, slot, meta)
-		InitNum++
-		InitTime = (InitTime*(InitNum-1) + uint64(instance.InitDurationInMs)) / InitNum
-		if err != nil {
-			errorMessage := fmt.Sprintf("Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
-			log.Printf(errorMessage)
-			return nil, status.Error(codes.Internal, errorMessage)
-		}
-
-		// add instance to instances map
-		s.mu.Lock()
-		instance.Busy = true
-		s.instances[instance.Id] = instance
-		s.mu.Unlock()
-		log.Printf("[No Idle Instance] Assign request id: %s, request interval: %dms Num: %d, instance %s created for app %s, init latency: %dms", request.RequestId, s.requestInterval, s.requestNum, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
-
-		return &pb.AssignReply{
-			Status: pb.Status_Ok,
-			Assigment: &pb.Assignment{
-				RequestId:  request.RequestId,
-				MetaKey:    instance.Meta.Key,
-				InstanceId: instance.Id,
-			},
-			ErrorMessage: nil,
-		}, nil
-	}
-
-use_idle_instance:
-	// reuse idle instance if idle instance is available
-	if s.idleInstance.Len() > 0 {
+	replyIdle, err := s.idleUse(request)
+	if err == nil {
 		idle_use = true
-		e := s.idleInstance.Front()
-		instance := e.Value.(*model.Instance)
-		instance.Busy = true
-		instanceId = instance.Id
-		s.idleInstance.Remove(e)
-		s.mu.Unlock()
-		log.Printf("[Idle Instance] Assign request id: %s, type: %s, request interval: %dms Num: %d, instance %s reused", request.RequestId, s.metaData.Key, s.requestInterval, s.requestNum, instanceId)
-		return &pb.AssignReply{
-			Status: pb.Status_Ok,
-			Assigment: &pb.Assignment{
-				RequestId:  request.RequestId,
-				MetaKey:    instance.Meta.Key,
-				InstanceId: instanceId,
-			},
-			ErrorMessage: nil,
-		}, nil
+		return replyIdle, err
 	}
-	// s.mu.Unlock()
+	s.mu.Unlock()
 
-	return nil, nil
+	resourceConfig := &model.SlotResourceConfig{
+		ResourceConfig: pb.ResourceConfig{
+			MemoryInMegabytes: request.MetaData.MemoryInMb,
+		},
+	}
+	meta := &model.Meta{
+		Meta: pb.Meta{
+			Key:           request.MetaData.Key,
+			Runtime:       request.MetaData.Runtime,
+			TimeoutInSecs: request.MetaData.TimeoutInSecs,
+		},
+	}
+	s.mu.Lock()
+	if s.idleInstance.Len() > 0 {
+		replyIdle, err := s.idleUse(request)
+		if err == nil {
+			idle_use = true
+			s.mu.Unlock()
+			return replyIdle, err
+		}
+	}
+	s.mu.Unlock()
+
+	// create new instance
+	slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
+	if err != nil {
+		errorMessage := fmt.Sprintf("Assign request id: %s, create slot error: %s", request.RequestId, err.Error())
+		log.Printf(errorMessage)
+		return nil, status.Error(codes.Internal, errorMessage)
+	}
+
+	s.mu.Lock()
+	if s.idleInstance.Len() > 0 {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.deleteSlot(ctx, request.RequestId, slot.Id, instanceId, request.MetaData.Key, "before initializing instance find idle instance")
+		}()
+		replyIdle, err := s.idleUse(request)
+		if err == nil {
+			idle_use = true
+			s.mu.Unlock()
+			return replyIdle, err
+		}
+	}
+	s.mu.Unlock()
+
+	instance, err := s.platformClient.Init(ctx, request.RequestId, instanceId, slot, meta)
+	if err != nil {
+		errorMessage := fmt.Sprintf("Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
+		log.Printf(errorMessage)
+		return nil, status.Error(codes.Internal, errorMessage)
+	}
+
+	InitNum++
+	InitTime = (InitTime*(InitNum-1) + uint64(instance.InitDurationInMs)) / InitNum
+
+	// add instance to instances map
+	s.mu.Lock()
+	instance.Busy = true
+	s.instances[instance.Id] = instance
+	s.mu.Unlock()
+	log.Printf("[No Idle Instance] Assign request id: %s, request interval: %dms Num: %d, instance %s created for app %s, init latency: %dms", request.RequestId, s.requestInterval, s.requestNum, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
+
+	return &pb.AssignReply{
+		Status: pb.Status_Ok,
+		Assigment: &pb.Assignment{
+			RequestId:  request.RequestId,
+			MetaKey:    instance.Meta.Key,
+			InstanceId: instance.Id,
+		},
+		ErrorMessage: nil,
+	}, nil
+
 }
 
 func (s *Scheduler) Idle(ctx context.Context, request *pb.IdleRequest) (*pb.IdleReply, error) {
