@@ -113,11 +113,19 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 					MemoryInMegabytes: request.MetaData.MemoryInMb,
 				},
 			}
-			slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
-			if err != nil {
-				log.Printf("[Sparse Bursty] Assign request id: %s, init slot error: %s", request.RequestId, err.Error())
-				return
+
+			var slot *model.Slot
+			if s.idleSlot.Len() > 0 {
+				slot = s.idleSlot.Front().Value.(*model.Slot)
+			} else {
+				var err error
+				slot, err = s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
+				if err != nil {
+					log.Printf("[Sparse Bursty] Assign request id: %s, init slot error: %s", request.RequestId, err.Error())
+					return
+				}
 			}
+
 			meta := &model.Meta{
 				Meta: pb.Meta{
 					Key:           request.MetaData.Key,
@@ -125,6 +133,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 					TimeoutInSecs: request.MetaData.TimeoutInSecs,
 				},
 			}
+
 			instance, err := s.platformClient.Init(ctx, request.RequestId, uuid.New().String(), slot, meta)
 			InitNum++
 			InitTime = (InitTime*(InitNum-1) + uint64(instance.InitDurationInMs)) / InitNum
@@ -132,6 +141,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 				log.Printf("[Sparse Bursty] Assign request id: %s, init instance error: %s", request.RequestId, err.Error())
 				return
 			}
+
 			s.mu.Lock()
 			s.instances[instance.Id] = instance
 			s.idleInstance.PushFront(instance)
@@ -156,11 +166,24 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 					MemoryInMegabytes: request.MetaData.MemoryInMb,
 				},
 			}
-			slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
-			if err != nil {
-				log.Printf("[Bursty] Assign request id: %s, init slot error: %s", request.RequestId, err.Error())
-				return
+			// slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
+
+			// if err != nil {
+			// log.Printf("[Bursty] Assign request id: %s, init slot error: %s", request.RequestId, err.Error())
+			// return
+			// }
+			var slot *model.Slot
+			if s.idleSlot.Len() > 0 {
+				slot = s.idleSlot.Front().Value.(*model.Slot)
+			} else {
+				var err error
+				slot, err = s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
+				if err != nil {
+					log.Printf("[Sparse Bursty] Assign request id: %s, init slot error: %s", request.RequestId, err.Error())
+					return
+				}
 			}
+
 			meta := &model.Meta{
 				Meta: pb.Meta{
 					Key:           request.MetaData.Key,
@@ -274,7 +297,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 		s.mu.Lock()
 		if s.idleInstance.Len() > 0 {
 			s.idleSlot.PushFront(slot)
-			log.Printf("Assign request id: %s, type %s, back slot %s, idle slot num: %d", request.RequestId, request.MetaData.Key, slot.Id, s.idleSlot.Len())
+			log.Printf("[Back Slot]Assign request id: %s, type %s, back slot %s, idle slot num: %d", request.RequestId, request.MetaData.Key, slot.Id, s.idleSlot.Len())
 			if replyIdle, err := s.idleUse(request); err == nil {
 				idle_use = true
 				s.mu.Unlock()
@@ -403,7 +426,7 @@ func (s *Scheduler) gcLoop() {
 					}
 				}
 				if s.requestNum == lastRequestNum && s.idleInstance.Len() > 0 && num != s.idleInstance.Len() {
-					reason := fmt.Sprintf("request type %s num is not changed, delete %d idle instances", s.metaData.Key, num)
+					fmt.Printf("request type %s num is not changed, delete %d idle instances, and back them slot\n", s.metaData.Key, num)
 					for element := s.idleInstance.Back(); element != nil; element = s.idleInstance.Back() {
 						if num == 0 {
 							break
@@ -411,12 +434,10 @@ func (s *Scheduler) gcLoop() {
 						instance := element.Value.(*model.Instance)
 						s.idleInstance.Remove(element)
 						delete(s.instances, instance.Id)
-						go func() {
-							ctx := context.Background()
-							ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-							defer cancel()
-							s.deleteSlot(ctx, uuid.NewString(), instance.Slot.Id, instance.Id, instance.Meta.Key, reason)
-						}()
+
+						slot := instance.Slot
+						s.idleSlot.PushFront(slot)
+
 						num--
 					}
 					break
