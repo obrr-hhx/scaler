@@ -24,7 +24,7 @@ const (
 	MAXIDLEINSTANCE = 30000 // max idle instance number
 	MINIDLEINSTANCE = 1000  // min idle instance number
 
-	THRESHOLD  = 25   // bursty threshold
+	THRESHOLD  = 500  // bursty threshold
 	BUSRTYTIME = 2000 // the interval time that the request type is bursty
 
 	PRECREATE = 15 // the number of instances that can be created in advance
@@ -44,6 +44,7 @@ type Scheduler struct {
 	instances       map[string]*model.Instance
 	idleInstance    *list.List
 	idleSlot        *list.List
+	deleteAll       bool
 	lastRequestTime uint64
 	requestInterval uint64
 	requestNum      uint64
@@ -63,6 +64,7 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 		instances:       make(map[string]*model.Instance),
 		idleInstance:    list.New(),
 		idleSlot:        list.New(),
+		deleteAll:       bool(false),
 		lastRequestTime: 0,
 		requestInterval: 0,
 		requestNum:      0,
@@ -101,7 +103,8 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 	}
 	if !busrty && s.requestNum > THRESHOLD {
 		if interval_ms <= InitTime*2 {
-			return // the request interval is too small, we cannot create new instances
+			s.deleteAll = true
+			return // the request interval is too small, we cannot create new instances, but we need delete all instances when them idle
 		}
 		go func() {
 			// wait the interval time to new a instance
@@ -152,6 +155,7 @@ func (s *Scheduler) waitFollowingRequest(ctx context.Context, request *pb.Assign
 	}
 
 	if !busrty {
+		s.deleteAll = true
 		return
 	}
 
@@ -412,6 +416,23 @@ func (s *Scheduler) gcLoop() {
 		count++
 		for {
 			s.mu.Lock()
+			if s.deleteAll {
+				// prevent high source usage from bursty but little requests
+				reason := fmt.Sprintf("delete all idle instances for app %s", s.metaData.Key)
+				for element := s.idleInstance.Front(); element != nil; element = element.Next() {
+					instance := element.Value.(*model.Instance)
+					s.idleInstance.Remove(element)
+					delete(s.instances, instance.Id)
+					go func() {
+						defer s.wg.Done()
+						ctx := context.Background()
+						ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+						defer cancel()
+						s.deleteSlot(ctx, uuid.NewString(), instance.Slot.Id, instance.Id, instance.Meta.Key, reason)
+					}()
+				}
+				s.deleteAll = false
+			}
 			// check if last request is too old delete all idle instances
 			if count == 10 {
 				count = 0
@@ -421,13 +442,14 @@ func (s *Scheduler) gcLoop() {
 					// cannot make num equal to idleInstance.Len(), do not delete all idle instances
 					for num == s.idleInstance.Len() {
 						// set random seed
+						// rand.Seed(time.Now().UnixNano())
 						rand.Seed(time.Now().UnixNano())
 						num = rand.Intn(s.idleInstance.Len()) + 1
 					}
 				}
 				if s.requestNum == lastRequestNum && s.idleInstance.Len() > 0 && num != s.idleInstance.Len() {
 					fmt.Printf("request type %s num is not changed, delete %d idle instances, and back them slot\n", s.metaData.Key, num)
-					for element := s.idleInstance.Back(); element != nil; element = s.idleInstance.Back() {
+					for element := s.idleInstance.Front(); element != nil; element = element.Next() {
 						if num == 0 {
 							break
 						}
@@ -445,21 +467,24 @@ func (s *Scheduler) gcLoop() {
 				lastRequestNum = s.requestNum
 			}
 
-			if element := s.idleInstance.Back(); element != nil {
+			for element := s.idleInstance.Front(); element != nil; element = element.Next() {
 				instance := element.Value.(*model.Instance)
 				idleDuration := time.Since(instance.LastIdleTime)
 				if idleDuration > s.config.IdleDurationBeforeGC {
 					// start to remove idle instance
 					s.idleInstance.Remove(element)
 					delete(s.instances, instance.Id)
-					s.mu.Unlock()
+					// s.mu.Unlock()
+					s.wg.Add(1)
 					go func() {
+						defer s.wg.Done()
 						reason := fmt.Sprintf("idle duration %fs exceeds threshold %fs", idleDuration.Seconds(), s.config.IdleDurationBeforeGC.Seconds())
 						ctx := context.Background()
 						ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 						defer cancel()
 						s.deleteSlot(ctx, uuid.NewString(), instance.Slot.Id, instance.Id, instance.Meta.Key, reason)
 					}()
+				} else {
 					continue
 				}
 			}
