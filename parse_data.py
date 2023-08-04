@@ -2,6 +2,8 @@ import json
 import os
 import sys
 
+data = {}
+
 # read data from given file
 def read_data(file_name):
     res = []
@@ -16,51 +18,176 @@ def read_data(file_name):
 def parse_data(data):
     appCount = {}
     start_time = {}
-    start_time_interval = {}
+    end_time = {}
+    idle_time = {}
     for d in data:
         if d["metaKey"] not in appCount:
             appCount[d["metaKey"]] = 0
-            start_time[d["metaKey"]] = d["startTime"]
-            start_time_interval[d["metaKey"]] = []
+            start_time[d["metaKey"]] = []
+            start_time[d["metaKey"]].append(d["startTime"])
+            end_time[d["metaKey"]] = []
+            end_time[d["metaKey"]].append(d["startTime"] + d["durationsInMs"])
+            idle_time[d["metaKey"]] = []
         else :
             appCount[d["metaKey"]] += 1
-            pre_start_time = start_time[d["metaKey"]]
-            now_start_time = d["startTime"]
-            start_time[d["metaKey"]] = now_start_time
-            start_time_interval[d["metaKey"]].append(now_start_time - pre_start_time)
+            start_time[d["metaKey"]].append(d["startTime"])
+            end_time[d["metaKey"]].append(d["startTime"] + d["durationsInMs"])
     res = {}
     res["appCount"] = appCount
-    interval = {}
-    duration_time = {}
-    for key in start_time_interval:
-        try:
-            interval[key] = sum(start_time_interval[key]) / len(start_time_interval[key])
-            duration_time[key] = sum(start_time_interval[key])
-        except ZeroDivisionError:
-            continue
-    res["start_time_interval"] = interval
-    res["duration_time"] = duration_time
+    for k, _ in start_time.items():
+        start = start_time[k]
+        end = end_time[k]
+        for i in range(len(start)):
+            idle = 100000000
+            for j in range(len(end)):
+                if start[i] - end[j] > 0 and start[i] - end[j] < idle:
+                    idle = start[i] - end[j]
+            if idle != 100000000:
+                idle_time[k].append(idle)
+    res["start_time"] = start_time
+    res["end_time"] = end_time
+    res["idle_time"] = idle_time
     return res
+
+def read_metas(metasPath):
+    global data
+    data["metas"] = {}
+    with open(metasPath, 'r') as f:
+        # read file line by line
+        for line in f:
+            # convert line to json object
+            d = json.loads(line)
+            # res.append(d)
+            data["metas"][d["key"]] = d["initDurationInMs"]
+
+class Req:
+    def __init__(self, r_type, r_start, r_duration):
+        self.type_ = r_type
+        self.startTime_ = r_start
+        self.durationTime_ = r_duration
+        self.initTime_ = 0
+        self.endTime_ = 0
+    def to_string(self) -> str:
+        string = "request type: " + self.type_ + "\n"
+        string += "\tstart time: " + str(self.startTime_) + "\n"
+        if self.initTime_ != 0:
+            string += "\tinit duration time: " + str(self.initTime_) +"ms\n"
+        string += "\tduration time: " + str(self.durationTime_) + "ms\n"
+        if self.endTime_ != 0:
+            string += "\tend time: " + str(self.endTime_) + "\n"
+        return string
+    def addInitTime(self, init_time):
+        self.initTime_ = init_time
+    def endTime(self):
+        self.endTime_ = self.startTime_ + self.initTime_ + self.durationTime_
+
+
+def read_requests(requestPath):
+    global data
+    requests = {}
+    with open(requestPath, 'r') as f:
+        # read file line by line
+        for line in f:
+            # convert line to json object
+            d = json.loads(line)
+            if d["metaKey"] not in requests:
+                requests[d["metaKey"]] = []
+
+            request_type = d["metaKey"]
+            startTime = d["startTime"]
+            durationTime = d["durationsInMs"]
+            request = Req(request_type, startTime, durationTime)
+            requests[request_type].append(request)
+                
+    data["requests"] = requests
+
+def parse_requests(requests):
+    allRequests = []
+    policy = {}
+    for k, v in requests.items():
+        policy[k] = {}
+        policy[k]["pre_warm_window"] = 999999999999
+        policy[k]["keep_alive_window"] = 0
+
+        init_time = v[0].initTime_
+        
+        allRequests = v
+    
+        # sort all requests
+        allRequests.sort(key=lambda x: x.startTime_)
+
+        cluster = []
+        idle_time = []
+        j=0
+        for i in range(1, len(allRequests)):
+            if allRequests[i].startTime_ > allRequests[i-1].endTime_:
+                cluster.append(i-j)
+                idle_time.append(allRequests[i].startTime_ - allRequests[i-1].endTime_)
+                j = i
+        cluster.append(len(allRequests) - j)
+        # print("requests come pattern: ", cluster)
+        if len(idle_time) != 0:
+            # print("idle time: ", idle_time)
+            try:
+                for it in idle_time:
+                        if it > init_time and it <= policy[k]["pre_warm_window"]:
+                            policy[k]["pre_warm_window"] = it
+                policy[k]["keep_alive_window"] = max(idle_time)
+            except:
+                    print("Request type: ", k, "num:", len(v))
+                    print(idle_time)
+        if policy[k]["pre_warm_window"] == 999999999999:
+            policy[k]["pre_warm_window"] = 0
+    return policy
 
 if __name__ == '__main__':
     # check if the number of arguments is correct
     if len(sys.argv) != 2:
-        print('Usage: python parse_data.py <input_file>')
+        print('Usage: python parse_data.py <input_directory>')
         sys.exit(1)
     # check if the input file exists
     if not os.path.exists(sys.argv[1]):
-        print('Input file does not exist!')
+        print('Input directory does not exist!')
         sys.exit(1)
-
+    
     # read data from input file
-    data = read_data(sys.argv[1])
+    metas_path = sys.argv[1] + "/metas"
+    request_path = sys.argv[1] + "/requests"
+
+    read_metas(metas_path)
+    read_requests(request_path)
+
+    # for k, v in data["metas"].items():
+    #     print("request type: ", k, end=" ")
+    #     print("init duration time: ", v, "ms")
+
+    
+    for k, v in data["requests"].items():
+        initTime = data["metas"][k]
+        for req in v:
+            req.addInitTime(initTime)
+    
+    for _, v in data["requests"].items():
+        for request in v:
+            request.endTime()
+            # print(request.to_string(), end="")
+
+    policy = parse_requests(data["requests"])
+
+    json_name = sys.argv[1].split("/")[-1]
+    json_name += ".json"
+    print(json_name)
+    with open(json_name, "w") as f:
+        json.dump(policy, f, indent=4)
+    # data = read_data(sys.argv[1])
     # parse data
-    res = parse_data(data)
+    # res = parse_data(data)
     # print result
-    print("app Number: ", len(res["appCount"]))
-    for key, value in res["appCount"].items():
-        if value > 50:
-            print("high frequency request: ", key, " ", value)
-            print("average start time interval: ", res["start_time_interval"][key])
-            print("app duration time: ", res["duration_time"][key]/1000, "s")
+    # print("app Number: ", len(res["appCount"]))
+    # for key, value in res["appCount"].items():
+        # if value > 0:
+            # print("request num: ", key, " ", value+1)
+            # print("start time: ", res["start_time"][key])
+            # print("end time: ", res["end_time"][key])
+            # print("idle time: ", res["idle_time"][key])
     # print(res)

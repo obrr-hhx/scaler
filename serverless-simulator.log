@@ -1,0 +1,292 @@
+Scaler is ready to accept connections.
+[2m2023-08-01T02:21:28.231274Z[0m [32m INFO[0m [2mserverless_sim[0m[2m:[0m platform start running on addr: 127.0.0.1:50051
+[2m2023-08-01T02:21:28.242353Z[0m [32m INFO[0m [2mserverless_sim::web[0m[2m:[0m web server listening on 127.0.0.1:9000
+Simulator is ready to accept connections.
+User specified datasets: function_smoke_test
+Starting simulation: function_smoke_test
+Note: Unnecessary use of -X or --request, POST is already inferred.
+*   Trying 127.0.0.1:9000...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* Connected to 127.0.0.1 (127.0.0.1) port 9000 (#0)
+[2m2023-08-01T02:21:38.493927Z[0m [32m INFO[0m [2mserverless_sim::web::handles[0m[2m:[0m simulate config: SimulateConfig {
+    id: "function_smoke_test",
+    request_file_path: "/tmp/data/function_smoke_test/requests",
+    meta_file_path: "/tmp/data/function_smoke_test/metas",
+}
+[2m2023-08-01T02:21:38.504484Z[0m [32m INFO[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m generate invocation load from file: /tmp/data/function_smoke_test/requests
+> POST /start HTTP/1.1
+> Host: 127.0.0.1:9000
+> User-Agent: curl/7.81.0
+> Accept: */*
+> Content-Type: application/json
+> Content-Length: 145
+> 
+} [145 bytes data]
+* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< content-length: 0
+< date: Tue, 01 Aug 2023 02:21:38 GMT
+< 
+100   145    0     0  100   145      0   5827 --:--:-- --:--:-- --:--:--  6304
+* Connection #0 to host 127.0.0.1 left intact
+[2m2023-08-01T02:21:38.571265Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:21:38.571565Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 0s, execution: 0s, schedule: 0s, idle: 0s
+[2m2023-08-01T02:21:38.571820Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 0, failed: 0
+[2m2023-08-01T02:21:38.572030Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 0gbs, slot live currently: 0
+[2m2023-08-01T02:21:48.841793Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:21:48.841863Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 0s, execution: 0s, schedule: 0s, idle: 0s
+[2m2023-08-01T02:21:48.841913Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 0, failed: 0
+[2m2023-08-01T02:21:49.325775Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 92gbs, slot live currently: 85
+[2m2023-08-01T02:21:54.585654Z[0m [32m INFO[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m request cfce84bb-7b6c-4e47-b350-3b7b8ccb55e5: instance 9674c4d7-fa51-428a-a312-8ec639feb7e5 set to error
+[2m2023-08-01T02:21:56.347619Z[0m [32m INFO[0m [2mserverless_sim::platform::server[0m[2m:[0m end destroy slot: 13ca1d4d-26c1-4fbf-9749-f0d6fb124512
+[2m2023-08-01T02:22:01.907984Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 187ea606-d476-4e6c-aeb4-0b8c5aa32878, took: 1733ms
+[2m2023-08-01T02:22:01.908074Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 187ea606-d476-4e6c-aeb4-0b8c5aa32878, took: 1733ms
+[2m2023-08-01T02:22:01.908910Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 2c58209a-54dd-4c0c-a957-b74cfadb6dee, took: 1734ms
+[2m2023-08-01T02:22:01.908983Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 2c58209a-54dd-4c0c-a957-b74cfadb6dee, took: 1734ms
+[2m2023-08-01T02:22:01.919242Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: e16bc742-7a32-4626-a9b4-195c3bab473c, took: 1207ms
+[2m2023-08-01T02:22:01.919341Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: e16bc742-7a32-4626-a9b4-195c3bab473c, took: 1208ms
+[2m2023-08-01T02:22:01.919537Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: d61d62c2-831e-453f-9126-e4b4ac815f20, took: 1743ms
+[2m2023-08-01T02:22:01.927874Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: e0b265e2-1d1c-4bbc-b8dc-abb81925a9c7, took: 1753ms
+[2m2023-08-01T02:22:01.927969Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: e0b265e2-1d1c-4bbc-b8dc-abb81925a9c7, took: 1753ms
+[2m2023-08-01T02:22:01.932285Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 95328229-a9d9-40c5-8a46-93076c354ba3, took: 1741ms
+[2m2023-08-01T02:22:01.932399Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 95328229-a9d9-40c5-8a46-93076c354ba3, took: 1742ms
+[2m2023-08-01T02:22:01.932617Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 326ba37a-d9b6-48fc-beac-be8bf355b789, took: 1178ms
+[2m2023-08-01T02:22:01.932694Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 326ba37a-d9b6-48fc-beac-be8bf355b789, took: 1179ms
+[2m2023-08-01T02:22:01.932927Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: c4fbd1da-f054-4f90-a65a-687c324a4820, took: 1182ms
+[2m2023-08-01T02:22:01.932998Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: c4fbd1da-f054-4f90-a65a-687c324a4820, took: 1182ms
+[2m2023-08-01T02:22:01.933558Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 4554fb1c-1c89-4bb8-ad4a-f103735f49b5, took: 1229ms
+[2m2023-08-01T02:22:01.933646Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 4554fb1c-1c89-4bb8-ad4a-f103735f49b5, took: 1229ms
+[2m2023-08-01T02:22:02.106649Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:22:02.624183Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 1014s, execution: 143s, schedule: 800s, idle: 70s
+[2m2023-08-01T02:22:02.634511Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 246, failed: 0
+[2m2023-08-01T02:22:02.643563Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: d61d62c2-831e-453f-9126-e4b4ac815f20, took: 1750ms
+[2m2023-08-01T02:22:02.899786Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 92f6625f-4072-453d-86dc-c8384b3b922e, took: 1852ms
+[2m2023-08-01T02:22:02.909530Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 92f6625f-4072-453d-86dc-c8384b3b922e, took: 1862ms
+[2m2023-08-01T02:22:02.973959Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 3b8aa994-0d29-4619-921c-74a5aa84afce, took: 1916ms
+[2m2023-08-01T02:22:02.974082Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 3b8aa994-0d29-4619-921c-74a5aa84afce, took: 1924ms
+[2m2023-08-01T02:22:02.974349Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 1abc14c1-4843-4fe4-8404-35a3b0e9809c, took: 1909ms
+[2m2023-08-01T02:22:02.974400Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 1abc14c1-4843-4fe4-8404-35a3b0e9809c, took: 1909ms
+[2m2023-08-01T02:22:02.974848Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: c7c8a6cf-152d-49eb-9e21-6d894f1ebdaf, took: 1906ms
+[2m2023-08-01T02:22:02.975420Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: c7c8a6cf-152d-49eb-9e21-6d894f1ebdaf, took: 1907ms
+[2m2023-08-01T02:22:02.976064Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 6f54de95-19b1-4973-892b-122fad002ef7, took: 1907ms
+[2m2023-08-01T02:22:02.976135Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 6f54de95-19b1-4973-892b-122fad002ef7, took: 1907ms
+[2m2023-08-01T02:22:02.976432Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 6bfe2cbe-4b6e-4bac-b463-023587c62a92, took: 1837ms
+[2m2023-08-01T02:22:02.976984Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 6bfe2cbe-4b6e-4bac-b463-023587c62a92, took: 1838ms
+[2m2023-08-01T02:22:02.977649Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 14857690-6a9b-4206-ad28-f9d6a34ca42f, took: 1902ms
+[2m2023-08-01T02:22:02.977739Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 14857690-6a9b-4206-ad28-f9d6a34ca42f, took: 1902ms
+[2m2023-08-01T02:22:03.167204Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 8d7f447d-dadb-4f30-9875-f8146df583d4, took: 1727ms
+[2m2023-08-01T02:22:03.461706Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 8d7f447d-dadb-4f30-9875-f8146df583d4, took: 2022ms
+[2m2023-08-01T02:22:03.746751Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: b9ec489f-f958-415a-a8b4-80a246abc5db, took: 2670ms
+[2m2023-08-01T02:22:03.752162Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: fd68c124-7839-4da7-8ce0-50d18e87fb0f, took: 2313ms
+[2m2023-08-01T02:22:03.752231Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: fd68c124-7839-4da7-8ce0-50d18e87fb0f, took: 2313ms
+[2m2023-08-01T02:22:04.578831Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long time of remove ,request: d61d62c2-831e-453f-9126-e4b4ac815f20, took: 1924ms
+[2m2023-08-01T02:22:04.736379Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 98ae6dee-1484-4b00-86f0-53f0ed6c6811, took: 1273ms
+[2m2023-08-01T02:22:04.736445Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 98ae6dee-1484-4b00-86f0-53f0ed6c6811, took: 1273ms
+[2m2023-08-01T02:22:04.736718Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 118c1fac-b2fc-4009-9b82-0acb0ccc5ba8, took: 2766ms
+[2m2023-08-01T02:22:04.736770Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 118c1fac-b2fc-4009-9b82-0acb0ccc5ba8, took: 2766ms
+[2m2023-08-01T02:22:04.737155Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: f3c2a52b-4444-4c26-9282-275c6123574a, took: 2762ms
+[2m2023-08-01T02:22:04.737207Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: f3c2a52b-4444-4c26-9282-275c6123574a, took: 2762ms
+[2m2023-08-01T02:22:04.778233Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 7633gbs, slot live currently: 594
+[2m2023-08-01T02:22:04.913255Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 096f9cf5-c5dc-412d-b471-2561651179d0, took: 2881ms
+[2m2023-08-01T02:22:04.913356Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 096f9cf5-c5dc-412d-b471-2561651179d0, took: 2881ms
+[2m2023-08-01T02:22:04.913782Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 54b7de07-6dd5-4a38-aedc-258e1fb91b76, took: 2350ms
+[2m2023-08-01T02:22:04.913869Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 54b7de07-6dd5-4a38-aedc-258e1fb91b76, took: 2351ms
+[2m2023-08-01T02:22:04.915977Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: c0fb7e18-2630-4592-9174-c94ff008ca8e, took: 2894ms
+[2m2023-08-01T02:22:04.918513Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 4ffce4fe-e7c7-43e9-b363-785cf90d878d, took: 2943ms
+[2m2023-08-01T02:22:04.918624Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 4ffce4fe-e7c7-43e9-b363-785cf90d878d, took: 2943ms
+[2m2023-08-01T02:22:04.919033Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 610227ee-0271-4f79-ab04-dab92d6e77f6, took: 2021ms
+[2m2023-08-01T02:22:04.919110Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 610227ee-0271-4f79-ab04-dab92d6e77f6, took: 2021ms
+[2m2023-08-01T02:22:04.937017Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 19473c2a-72ce-4179-8853-028d3e44dfcc, took: 2882ms
+[2m2023-08-01T02:22:04.942093Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 19473c2a-72ce-4179-8853-028d3e44dfcc, took: 2887ms
+[2m2023-08-01T02:22:04.950337Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: bb48adc3-9f52-456d-ab52-c51831c3f2b0, took: 1486ms
+[2m2023-08-01T02:22:04.941158Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 74aab618-16f1-43df-ae35-684556be2582, took: 2885ms
+[2m2023-08-01T02:22:04.965552Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 74aab618-16f1-43df-ae35-684556be2582, took: 2909ms
+[2m2023-08-01T02:22:04.941265Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: adf27b18-f9a1-4c19-8281-1c86ba612dbf, took: 2909ms
+[2m2023-08-01T02:22:04.983067Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: adf27b18-f9a1-4c19-8281-1c86ba612dbf, took: 2951ms
+[2m2023-08-01T02:22:04.941527Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: a0701c84-f4a4-416c-99f7-aee193511607, took: 2920ms
+[2m2023-08-01T02:22:04.941566Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 1ab10d75-d50b-413e-8682-6d87d0ddb84d, took: 2920ms
+[2m2023-08-01T02:22:05.004805Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 1ab10d75-d50b-413e-8682-6d87d0ddb84d, took: 2984ms
+[2m2023-08-01T02:22:04.941661Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: bcc37dfd-bdb4-4493-8250-4d8816354f96, took: 2910ms
+[2m2023-08-01T02:22:05.010589Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: bcc37dfd-bdb4-4493-8250-4d8816354f96, took: 2979ms
+[2m2023-08-01T02:22:04.941814Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 620ac89d-82bc-47b7-944b-4d46e915998e, took: 2885ms
+[2m2023-08-01T02:22:05.014986Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 620ac89d-82bc-47b7-944b-4d46e915998e, took: 2958ms
+[2m2023-08-01T02:22:04.941968Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: d6c1a8fb-49c8-4a98-8726-f9bc7076a266, took: 2885ms
+[2m2023-08-01T02:22:05.017148Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: d6c1a8fb-49c8-4a98-8726-f9bc7076a266, took: 2960ms
+[2m2023-08-01T02:22:04.942047Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 6260787a-b39a-4b98-9ac2-25cce48007f5, took: 2967ms
+[2m2023-08-01T02:22:05.024816Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 6260787a-b39a-4b98-9ac2-25cce48007f5, took: 3049ms
+[2m2023-08-01T02:22:05.003720Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: a0701c84-f4a4-416c-99f7-aee193511607, took: 2982ms
+[2m2023-08-01T02:22:04.940172Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: c0fb7e18-2630-4592-9174-c94ff008ca8e, took: 2895ms
+[2m2023-08-01T02:22:04.954521Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 5d7add99-f758-4577-bcc4-31866e556e4a, took: 1490ms
+[2m2023-08-01T02:22:05.044040Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 5d7add99-f758-4577-bcc4-31866e556e4a, took: 1580ms
+[2m2023-08-01T02:22:04.954521Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: ca963524-0336-4fe9-a386-00aae7c9569a, took: 1490ms
+[2m2023-08-01T02:22:05.045770Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: ca963524-0336-4fe9-a386-00aae7c9569a, took: 1582ms
+[2m2023-08-01T02:22:04.941354Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 9d33344f-20ea-4646-a843-979797ba15c3, took: 2966ms
+[2m2023-08-01T02:22:04.941638Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: f2b50911-7aec-48ad-b17c-60b03112c16d, took: 2920ms
+[2m2023-08-01T02:22:05.051030Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: f2b50911-7aec-48ad-b17c-60b03112c16d, took: 3029ms
+[2m2023-08-01T02:22:04.941897Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: b94d00ef-c6a2-407f-a8fa-29dba30c6913, took: 2966ms
+[2m2023-08-01T02:22:05.057557Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: b94d00ef-c6a2-407f-a8fa-29dba30c6913, took: 3082ms
+[2m2023-08-01T02:22:05.064367Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: bb48adc3-9f52-456d-ab52-c51831c3f2b0, took: 1889ms
+[2m2023-08-01T02:22:04.941745Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: d4539e7f-8eee-4b61-8d15-d47bb629a674, took: 2968ms
+[2m2023-08-01T02:22:05.066400Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: d4539e7f-8eee-4b61-8d15-d47bb629a674, took: 3095ms
+[2m2023-08-01T02:22:05.049562Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 9d33344f-20ea-4646-a843-979797ba15c3, took: 3074ms
+[2m2023-08-01T02:22:05.070690Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: c5f6d3f2-b9d3-465f-adc5-970c0e9cfa84, took: 1313ms
+[2m2023-08-01T02:22:05.070742Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: c5f6d3f2-b9d3-465f-adc5-970c0e9cfa84, took: 1313ms
+[2m2023-08-01T02:22:05.071156Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 3b397ef1-60bc-4319-b01e-1a8c4573aed6, took: 1336ms
+[2m2023-08-01T02:22:05.071231Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 3b397ef1-60bc-4319-b01e-1a8c4573aed6, took: 1336ms
+[2m2023-08-01T02:22:05.071444Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: c832195a-d4ec-4b60-a121-eb82a8f3996e, took: 1319ms
+[2m2023-08-01T02:22:05.072067Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: c832195a-d4ec-4b60-a121-eb82a8f3996e, took: 1319ms
+[2m2023-08-01T02:22:05.072267Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: d5af1e60-9500-47f7-a5b9-6b7e3bec8617, took: 1337ms
+[2m2023-08-01T02:22:05.072321Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: d5af1e60-9500-47f7-a5b9-6b7e3bec8617, took: 1338ms
+[2m2023-08-01T02:22:05.072551Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: d14b8b4c-6b25-43b0-9edd-adde3d871364, took: 1315ms
+[2m2023-08-01T02:22:05.072615Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: d14b8b4c-6b25-43b0-9edd-adde3d871364, took: 1315ms
+[2m2023-08-01T02:22:05.072795Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 585f523a-6dad-48ea-8431-0ef2557e7e53, took: 1337ms
+[2m2023-08-01T02:22:05.073327Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 585f523a-6dad-48ea-8431-0ef2557e7e53, took: 1338ms
+[2m2023-08-01T02:22:05.073606Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: a2a2992a-1629-4b44-af65-351d56517a0c, took: 1314ms
+[2m2023-08-01T02:22:05.073661Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: a2a2992a-1629-4b44-af65-351d56517a0c, took: 1315ms
+[2m2023-08-01T02:22:05.073876Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 18f0bd95-0c90-4ccc-b98b-41a89e030450, took: 1316ms
+[2m2023-08-01T02:22:05.073946Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 18f0bd95-0c90-4ccc-b98b-41a89e030450, took: 1316ms
+[2m2023-08-01T02:22:05.074122Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 49a0c295-5123-427d-86c3-de04ab3ed453, took: 1315ms
+[2m2023-08-01T02:22:05.074190Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 49a0c295-5123-427d-86c3-de04ab3ed453, took: 1315ms
+[2m2023-08-01T02:22:05.074354Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 79743255-c596-4659-b107-993d5df42c82, took: 1027ms
+[2m2023-08-01T02:22:05.074962Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 79743255-c596-4659-b107-993d5df42c82, took: 1027ms
+[2m2023-08-01T02:22:05.075246Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 51742331-fdc2-40f4-944f-4be61b11989a, took: 1323ms
+[2m2023-08-01T02:22:05.075298Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 51742331-fdc2-40f4-944f-4be61b11989a, took: 1323ms
+[2m2023-08-01T02:22:05.075486Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: e7c5ee8d-8627-4e1a-87b1-f74fdbb0bb55, took: 1603ms
+[2m2023-08-01T02:22:05.075532Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: e7c5ee8d-8627-4e1a-87b1-f74fdbb0bb55, took: 1603ms
+[2m2023-08-01T02:22:05.076866Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 13561734-8a49-4315-be05-41be2c862398, took: 1604ms
+[2m2023-08-01T02:22:05.077110Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 13561734-8a49-4315-be05-41be2c862398, took: 1605ms
+[2m2023-08-01T02:22:05.077617Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 3ba0c830-118c-49e3-b892-f88cfdcd4c9f, took: 1344ms
+[2m2023-08-01T02:22:05.077690Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 3ba0c830-118c-49e3-b892-f88cfdcd4c9f, took: 1610ms
+[2m2023-08-01T02:22:05.077904Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 4a94e71d-596a-4023-a8bb-8b3693b2526f, took: 1344ms
+[2m2023-08-01T02:22:05.080174Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 4a94e71d-596a-4023-a8bb-8b3693b2526f, took: 1344ms
+[2m2023-08-01T02:22:05.086423Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 6ba8c6b8-8b63-4c5b-98cc-f58d3332b37b, took: 1351ms
+[2m2023-08-01T02:22:05.086511Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 6ba8c6b8-8b63-4c5b-98cc-f58d3332b37b, took: 1351ms
+[2m2023-08-01T02:22:05.087779Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 9fb265aa-6910-4faf-8da7-16a97b2cda07, took: 1352ms
+[2m2023-08-01T02:22:05.100863Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: b0d513ec-fbeb-4f03-ae19-966e48552583, took: 1053ms
+[2m2023-08-01T02:22:05.101103Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: b0d513ec-fbeb-4f03-ae19-966e48552583, took: 1053ms
+[2m2023-08-01T02:22:05.111065Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: ab885272-ce51-440a-aedc-640d1f227bf6, took: 1638ms
+[2m2023-08-01T02:22:05.168491Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time of idle ,request: 36db0869-d087-42a4-b042-9a37b96b5060, took: 1118ms
+[2m2023-08-01T02:22:05.176633Z[0m [31mERROR[0m [2mserverless_sim::platform::load_generator[0m[2m:[0m too long free time ,request: 36db0869-d087-42a4-b042-9a37b96b5060, took: 1127ms
+[2m2023-08-01T02:22:16.249156Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:22:16.249333Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:22:16.249405Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:22:16.356871Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 15393gbs, slot live currently: 594
+[2m2023-08-01T02:22:29.623234Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:22:29.623463Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:22:29.623549Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:22:30.236362Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 24256gbs, slot live currently: 594
+[2m2023-08-01T02:22:42.436269Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:22:42.436654Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:22:42.437167Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:22:42.456513Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 32418gbs, slot live currently: 594
+[2m2023-08-01T02:22:53.451159Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:22:53.452472Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:22:53.452995Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:22:53.467313Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 39591gbs, slot live currently: 594
+[2m2023-08-01T02:23:05.099006Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:23:05.099195Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:23:05.099262Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:23:06.342293Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 47666gbs, slot live currently: 594
+[2m2023-08-01T02:23:16.989227Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:23:16.989453Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:23:16.990925Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:23:17.044260Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 54938gbs, slot live currently: 594
+[2m2023-08-01T02:23:27.907712Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:23:27.907932Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:23:27.908006Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:23:27.965091Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 62052gbs, slot live currently: 594
+[2m2023-08-01T02:23:39.902746Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:23:39.903286Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:23:39.903344Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:23:39.924603Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 69853gbs, slot live currently: 594
+[2m2023-08-01T02:23:50.183905Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:23:50.184029Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:23:50.184075Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:23:50.201830Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 76549gbs, slot live currently: 594
+[2m2023-08-01T02:24:00.407643Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:24:00.414913Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:24:00.415014Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:24:00.440471Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 83217gbs, slot live currently: 594
+[2m2023-08-01T02:24:10.612902Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:24:10.613187Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:24:10.617232Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:24:10.646753Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 89863gbs, slot live currently: 594
+[2m2023-08-01T02:24:20.972027Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:24:20.972170Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:24:20.972226Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:24:20.995756Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 96608gbs, slot live currently: 594
+[2m2023-08-01T02:24:31.865299Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:24:31.865431Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:24:31.865481Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:24:31.899811Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 103711gbs, slot live currently: 594
+[2m2023-08-01T02:24:42.552113Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:24:42.552246Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:24:42.552291Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:24:42.602093Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 110676gbs, slot live currently: 594
+[2m2023-08-01T02:24:52.796541Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:24:52.800249Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:24:52.800313Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:24:52.819641Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 117340gbs, slot live currently: 594
+[2m2023-08-01T02:25:03.065961Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:25:03.066082Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:25:03.066128Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:25:03.113828Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 124039gbs, slot live currently: 594
+[2m2023-08-01T02:25:13.413515Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:25:13.417717Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:25:13.418249Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:25:13.452906Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 130778gbs, slot live currently: 594
+[2m2023-08-01T02:25:23.616148Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:25:23.616288Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:25:23.616323Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:25:23.655529Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 137424gbs, slot live currently: 594
+[2m2023-08-01T02:25:33.829111Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:25:33.833555Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:25:33.834723Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:25:33.864282Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 144075gbs, slot live currently: 594
+[2m2023-08-01T02:25:44.045566Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:25:44.047243Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:25:44.048221Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:25:44.081018Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 150729gbs, slot live currently: 594
+[2m2023-08-01T02:25:54.304315Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:25:54.304520Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:25:54.309321Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:25:54.336156Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 157413gbs, slot live currently: 594
+[2m2023-08-01T02:26:04.604639Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:26:04.604790Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:26:04.604844Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:26:04.877615Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 164195gbs, slot live currently: 594
+[2m2023-08-01T02:26:15.264819Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:26:15.265013Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:26:15.265081Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:26:16.807108Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 171384gbs, slot live currently: 594
+[2m2023-08-01T02:26:34.383841Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:26:34.384130Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:26:34.384214Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:26:34.481299Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 183559gbs, slot live currently: 594
+[2m2023-08-01T02:26:45.063369Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:26:45.063515Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:26:45.063571Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:26:45.138038Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 190497gbs, slot live currently: 594
+[2m2023-08-01T02:26:55.496397Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:26:55.498107Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:26:55.498160Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:26:55.580865Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 197294gbs, slot live currently: 594
+[2m2023-08-01T02:26:56.835947Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:26:56.836372Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:26:56.836508Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:26:56.864721Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 198145gbs, slot live currently: 594
+[2m2023-08-01T02:27:06.081362Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:27:06.082562Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:27:06.082831Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:27:06.110635Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 204168gbs, slot live currently: 594
+Simulation finished: function_smoke_test
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+[2m2023-08-01T02:27:11.323783Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m start time: 2023-08-01 10:21:38
+[2m2023-08-01T02:27:11.327290Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m invocation time: total 2929s, execution: 189s, schedule: 2531s, idle: 208s
+[2m2023-08-01T02:27:11.327613Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m total requests : 394, failed: 0
+[2m2023-08-01T02:27:11.346850Z[0m [32m INFO[0m [2mserverless_sim::platform::statics[0m[2m:[0m slots live time in gbs: 207584gbs, slot live currently: 594
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0100   521  100   521    0     0  14895      0 --:--:-- --:--:-- --:--:-- 16806
+====== Contents of result_function_smoke_test.txt ======
+{"id":"function_smoke_test","requestFilePath":"/tmp/data/function_smoke_test/requests","metaFilePath":"/tmp/data/function_smoke_test/metas","startTime":"2023-08-01 10:21:38","endTime":"2023-08-01 10:26:56","totalRequestsCount":394,"failedRequestsCount":0,"successRate":1.0,"invocationLatencyInSecs":2929,"invocationExecutionTimeInSecs":189,"invocationExecutionTimeInGBs":133,"invocationScheduleTimeInSecs":2531,"invocationIdleTimeInSecs":208,"totalSlotTimeInGBs":207584,"totalLiveSlotCount":594,"score":3.259494240688186}

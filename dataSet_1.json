@@ -1,0 +1,22 @@
+{
+    "nodes1": {
+        "pre_warm_window": 57,
+        "keep_alive_window": 30144
+    },
+    "roles1": {
+        "pre_warm_window": 57,
+        "keep_alive_window": 8233908
+    },
+    "rolebindings1": {
+        "pre_warm_window": 14,
+        "keep_alive_window": 8233959
+    },
+    "certificatesigningrequests1": {
+        "pre_warm_window": 21,
+        "keep_alive_window": 8233968
+    },
+    "csinodes1": {
+        "pre_warm_window": 190410,
+        "keep_alive_window": 82260997
+    }
+}
