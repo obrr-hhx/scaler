@@ -19,11 +19,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type slotTime struct {
-	slot         *model.Slot
-	lastIdleTime time.Time
-}
-
 type Scheduler struct {
 	config            *config.Config
 	metaData          *model.Meta
@@ -32,9 +27,8 @@ type Scheduler struct {
 	wg                sync.WaitGroup
 	instances         map[string]*model.Instance
 	idleInstance      *list.List
-	idleSlot          *list.List
-	pre_warm_window   uint64
-	keep_alive_window uint64
+	pre_warm_window   int64
+	keep_alive_window int64
 }
 
 func New(metaData *model.Meta, config *config.Config) Scaler {
@@ -51,9 +45,8 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 		wg:                sync.WaitGroup{},
 		instances:         make(map[string]*model.Instance),
 		idleInstance:      list.New(),
-		idleSlot:          list.New(),
-		pre_warm_window:   uint64(PolicyMap[metaData.Key]["pre_warm_window"]),
-		keep_alive_window: uint64(PolicyMap[metaData.Key]["keep_alive_window"]),
+		pre_warm_window:   int64(PolicyMap[metaData.Key]["pre_warm_window"]),
+		keep_alive_window: int64(PolicyMap[metaData.Key]["keep_alive_window"]),
 	}
 
 	log.Printf("New scaler for app: %s is created", metaData.Key)
@@ -68,6 +61,8 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 }
 
 func (s *Scheduler) idleUseInstance(request *pb.AssignRequest) (*pb.AssignReply, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if element := s.idleInstance.Front(); element != nil {
 		instance := element.Value.(*model.Instance)
 		instance.Busy = true
@@ -87,17 +82,6 @@ func (s *Scheduler) idleUseInstance(request *pb.AssignRequest) (*pb.AssignReply,
 	return nil, errors.New("no idle instance")
 }
 
-func (s *Scheduler) idleUseSlot() (*model.Slot, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if element := s.idleSlot.Front(); element != nil {
-		slot := element.Value.(*slotTime).slot
-		s.idleSlot.Remove(element)
-		return slot, nil
-	}
-	return nil, errors.New("no idle slot")
-}
-
 func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.AssignReply, error) {
 	start := time.Now()
 	instanceId := uuid.New().String()
@@ -109,33 +93,35 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	log.Printf("Assign request id: %s", request.RequestId)
 
 	// check if there is idle instance
-	s.mu.Lock()
 	if reply, err := s.idleUseInstance(request); err == nil {
-		s.mu.Unlock()
 		return reply, nil
 	}
-	s.mu.Unlock()
 
-	// check if there is idle slot
-	slot, err := s.idleUseSlot()
-	if err == nil {
-		// create new instance
-		resourceConfig := &model.SlotResourceConfig{
-			ResourceConfig: pb.ResourceConfig{
-				MemoryInMegabytes: request.MetaData.MemoryInMb,
-			},
-		}
-		var err error
-		create_start := time.Now().UnixMilli()
-		slot, err = s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
-		create_end := time.Now().UnixMilli()
-		create_slot := create_end - create_start
-		log.Printf("create slot cost: %dms for memory size: %dMb", create_slot, request.MetaData.MemoryInMb)
-		if err != nil {
-			errorMessage := fmt.Sprintf("create slot failed with: %s", err.Error())
-			log.Printf(errorMessage)
-			return nil, status.Errorf(codes.Internal, errorMessage)
-		}
+	// create new instance
+	resourceConfig := &model.SlotResourceConfig{
+		ResourceConfig: pb.ResourceConfig{
+			MemoryInMegabytes: request.MetaData.MemoryInMb,
+		},
+	}
+	create_start := time.Now().UnixMilli()
+	slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
+	create_end := time.Now().UnixMilli()
+	create_slot := create_end - create_start
+	log.Printf("create slot %s cost: %dms for memory size: %dMb", slot.Id, create_slot, request.MetaData.MemoryInMb)
+	if err != nil {
+		errorMessage := fmt.Sprintf("create slot failed with: %s", err.Error())
+		log.Printf(errorMessage)
+		return nil, status.Errorf(codes.Internal, errorMessage)
+	}
+
+	if reply, err := s.idleUseInstance(request); err == nil {
+		go func() {
+			reason := "before init find idle instance"
+			ctx, cancel := context.WithTimeout(context.Background(), time.Duration(request.MetaData.TimeoutInSecs)*time.Second)
+			defer cancel()
+			s.deleteSlot(ctx, request.RequestId, slot.Id, " ", request.MetaData.Key, reason)
+		}()
+		return reply, nil
 	}
 
 	meta := &model.Meta{
@@ -157,7 +143,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	instance.Busy = true
 	s.instances[instance.Id] = instance
 	s.mu.Unlock()
-	// log.Printf("[No Idle Instance] Assign request id: %s, request interval: %dms Num: %d, instance %s created for app %s, init latency: %dms", request.RequestId, s.requestInterval, s.requestNum, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
+	log.Printf("Assign request id: %s, instance %s created for app %s, init latency: %dms", request.RequestId, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
 
 	return &pb.AssignReply{
 		Status: pb.Status_Ok,
@@ -206,6 +192,11 @@ func (s *Scheduler) Idle(ctx context.Context, request *pb.IdleRequest) (*pb.Idle
 
 	slotId = instance.Slot.Id
 	instance.LastIdleTime = time.Now()
+
+	if s.keep_alive_window == 0 {
+		needDestroy = true
+	}
+
 	if needDestroy {
 		log.Printf("request id %s needs to destroy instance %s", request.Assigment.RequestId, instanceId)
 		return reply, nil
@@ -215,16 +206,9 @@ func (s *Scheduler) Idle(ctx context.Context, request *pb.IdleRequest) (*pb.Idle
 		log.Printf("request id %s instance %s is already freed", request.Assigment.RequestId, instanceId)
 		return reply, nil
 	}
-	// instance.Busy = false
-	// s.idleInstance.PushFront(instance)
-	slot := instance.Slot
-	lastIdleTime := time.Now()
-	sT := &slotTime{
-		slot:         slot,
-		lastIdleTime: lastIdleTime,
-	}
-	s.idleSlot.PushFront(sT)
-	delete(s.instances, instanceId)
+
+	instance.Busy = false
+	s.idleInstance.PushFront(instance)
 	return reply, nil
 }
 
@@ -232,7 +216,7 @@ func (s *Scheduler) deleteSlot(ctx context.Context, requestId, slotId, instanceI
 	if slotId == "" {
 		return
 	}
-	// log.Printf("request id %s, delete slot %s, instance %s, reason: %s", requestId, slotId, instanceId, reason)
+	log.Printf("request id %s, delete slot %s, instance %s, reason: %s", requestId, slotId, instanceId, reason)
 	err := s.platformClient.DestroySLot(ctx, requestId, slotId, reason)
 	if err != nil {
 		log.Printf("request id %s, delete instance %s (Slot %s) for app %s error: %s", requestId, instanceId, slotId, metaKey, err.Error())
@@ -338,42 +322,10 @@ func (s *Scheduler) policyLoop() {
 	for range ticker.C {
 		for {
 			s.mu.Lock()
-			for idleSlotEntry := s.idleSlot.Front(); idleSlotEntry != nil; idleSlotEntry = idleSlotEntry.Next() {
-				idle_slot := idleSlotEntry.Value.(*slotTime)
-				if elaspedTime := time.Since(idle_slot.lastIdleTime).Milliseconds(); elaspedTime < int64(s.pre_warm_window) {
-					s.wg.Add(1)
-					go func() {
-						defer s.wg.Done()
-						// init instance based on the idle Slot
-						slot := idle_slot.slot
-						instanceId := uuid.NewString()
-						meta := &model.Meta{
-							Meta: pb.Meta{
-								Key:           s.metaData.Key,
-								Runtime:       s.metaData.Runtime,
-								TimeoutInSecs: s.metaData.TimeoutInSecs,
-							},
-						}
-						ctx := context.Background()
-						ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-						defer cancel()
-						instance, err := s.platformClient.Init(ctx, uuid.NewString(), instanceId, slot, meta)
-						if err != nil {
-							log.Printf("init instance for app %s failed: %v", s.metaData.Key, err)
-							return
-						}
-						s.mu.Lock()
-						s.instances[instanceId] = instance
-						s.idleInstance.PushBack(instance)
-						s.mu.Unlock()
-					}()
-				}
-			}
-
-			for element := s.idleInstance.Front(); element != nil; element = element.Next() {
+			if element := s.idleInstance.Back(); element != nil {
 				instance := element.Value.(*model.Instance)
-				idleDuration := time.Since(instance.LastIdleTime)
-				if idleDuration > time.Duration(s.keep_alive_window)*time.Millisecond {
+				idleDuration := time.Since(instance.LastIdleTime).Milliseconds()
+				if idleDuration >= s.keep_alive_window {
 					// start to remove idle instance
 					s.idleInstance.Remove(element)
 					delete(s.instances, instance.Id)
@@ -381,29 +333,13 @@ func (s *Scheduler) policyLoop() {
 					s.wg.Add(1)
 					go func() {
 						defer s.wg.Done()
-						reason := fmt.Sprintf("idle duration %fs exceeds threshold %fs", idleDuration.Seconds(), s.config.IdleDurationBeforeGC.Seconds())
+						reason := fmt.Sprintf("idle duration %dms exceeds threshold %dms", idleDuration, s.keep_alive_window)
 						ctx := context.Background()
 						ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 						defer cancel()
 						s.deleteSlot(ctx, uuid.NewString(), instance.Slot.Id, instance.Id, instance.Meta.Key, reason)
 					}()
-				}
-			}
-			for element := s.idleSlot.Front(); element != nil; element = element.Next() {
-				idle_slot := element.Value.(*slotTime)
-				if elaspedTime := time.Since(idle_slot.lastIdleTime).Milliseconds(); elaspedTime > int64(s.keep_alive_window) {
-					// delete idle slot
-					s.idleSlot.Remove(element)
-					slot := idle_slot.slot
-					s.mu.Unlock()
-					s.wg.Add(1)
-					go func() {
-						defer s.wg.Done()
-						ctx := context.Background()
-						ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-						defer cancel()
-						s.deleteSlot(ctx, uuid.NewString(), slot.Id, "idle slot", s.metaData.Key, "idle slot exceeds keep alive window")
-					}()
+					continue
 				}
 			}
 			s.mu.Unlock()
