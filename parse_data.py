@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+import math
 
 data = {}
 
@@ -132,7 +133,9 @@ def parse_requests(requests):
                 for it in idle_time:
                         if it > init_time and it <= policy[k]["pre_warm_window"]:
                             policy[k]["pre_warm_window"] = it
-                policy[k]["keep_alive_window"] = max(idle_time)
+                # policy[k]["keep_alive_window"] = max(idle_time)
+                idle_time.sort()
+                policy[k]["keep_alive_window"] = idle_time[int(len(idle_time) * 95 / 100)]
             except:
                     print("Request type: ", k, "num:", len(v))
                     print(idle_time)
@@ -140,6 +143,41 @@ def parse_requests(requests):
             policy[k]["pre_warm_window"] = 0
     return policy
 
+def parallel_requests(requests):
+    create_slot = 200 # ms
+    parallelism = {}
+    for k, v in requests.items():
+        parallelism[k] = {}
+        parallel_cluster = []
+        initTime = v[0].initTime_
+        v.sort(key=lambda x: x.startTime_)
+        i = 0
+        while i < len(v)-1:
+            for j in range(i+1, len(v)):
+                if v[j].startTime_ - v[i].startTime_ > initTime + create_slot:
+                    parallel_cluster.append(j - i)
+                    i = j
+                    break
+            i += 1
+        parallel_cluster.append(len(v) - i)
+
+        max_parallel = max(parallel_cluster)
+        if max_parallel < 0:
+            print(parallel_cluster)
+        max_i = parallel_cluster.index(max_parallel)
+        parallel_strengthen = 0
+        slot_num = 0
+        for i in range(0, max_i):
+            slot_num += parallel_cluster[i]
+        if slot_num != 0:
+            parallel_strengthen = math.ceil(max_parallel / slot_num)
+        # print("application: ", k, "\nparallel cluster max: ", max_parallel, "slot num: ", slot_num)
+        # print("parallel cluster strengthen: ")
+        # print(parallel_strengthen, "\n")
+        parallelism[k]["max_parallel_index"] = slot_num
+        parallelism[k]["parallel_strengthen"] = parallel_strengthen
+    return parallelism
+                
 if __name__ == '__main__':
     # check if the number of arguments is correct
     if len(sys.argv) != 2:
@@ -173,21 +211,13 @@ if __name__ == '__main__':
             # print(request.to_string(), end="")
 
     policy = parse_requests(data["requests"])
+    parallelism = parallel_requests(data["requests"])
+    for k, _ in policy.items():
+        policy[k]["max_parallel_index"] = parallelism[k]["max_parallel_index"]
+        policy[k]["parallel_strengthen"] = parallelism[k]["parallel_strengthen"]
 
     json_name = sys.argv[1].split("/")[-1]
     json_name += ".json"
     print(json_name)
     with open(json_name, "w") as f:
         json.dump(policy, f, indent=4)
-    # data = read_data(sys.argv[1])
-    # parse data
-    # res = parse_data(data)
-    # print result
-    # print("app Number: ", len(res["appCount"]))
-    # for key, value in res["appCount"].items():
-        # if value > 0:
-            # print("request num: ", key, " ", value+1)
-            # print("start time: ", res["start_time"][key])
-            # print("end time: ", res["end_time"][key])
-            # print("idle time: ", res["idle_time"][key])
-    # print(res)

@@ -27,8 +27,11 @@ type Scheduler struct {
 	wg                sync.WaitGroup
 	instances         map[string]*model.Instance
 	idleInstance      *list.List
+	request_num       int64
 	pre_warm_window   int64
 	keep_alive_window int64
+	parallel_num      int64
+	parallelism       int64
 }
 
 func New(metaData *model.Meta, config *config.Config) Scaler {
@@ -45,8 +48,11 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 		wg:                sync.WaitGroup{},
 		instances:         make(map[string]*model.Instance),
 		idleInstance:      list.New(),
+		request_num:       0,
 		pre_warm_window:   int64(PolicyMap[metaData.Key]["pre_warm_window"]),
 		keep_alive_window: int64(PolicyMap[metaData.Key]["keep_alive_window"]),
+		parallel_num:      int64(PolicyMap[metaData.Key]["max_parallel_index"]),
+		parallelism:       int64(PolicyMap[metaData.Key]["parallel_strengthen"]),
 	}
 
 	log.Printf("New scaler for app: %s is created", metaData.Key)
@@ -82,6 +88,36 @@ func (s *Scheduler) idleUseInstance(request *pb.AssignRequest) (*pb.AssignReply,
 	return nil, errors.New("no idle instance")
 }
 
+func (s *Scheduler) preWarmInstance() {
+	resourceConfig := &model.SlotResourceConfig{
+		ResourceConfig: pb.ResourceConfig{
+			MemoryInMegabytes: s.metaData.MemoryInMb,
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	slot, err := s.platformClient.CreateSlot(ctx, uuid.NewString(), resourceConfig)
+	if err != nil {
+		log.Printf("Pre warm instance, create slot error: %s", err.Error())
+	}
+	meta := &model.Meta{
+		Meta: pb.Meta{
+			Key:           s.metaData.Key,
+			Runtime:       s.metaData.Runtime,
+			TimeoutInSecs: s.metaData.TimeoutInSecs,
+		},
+	}
+	instance, err := s.platformClient.Init(ctx, uuid.NewString(), uuid.NewString(), slot, meta)
+	if err != nil {
+		errorMessage := fmt.Sprintf("Pre warm instance, init instance error: %s", err.Error())
+		log.Printf(errorMessage)
+	}
+	s.mu.Lock()
+	s.instances[instance.Id] = instance
+	s.idleInstance.PushFront(instance)
+	s.mu.Unlock()
+}
+
 func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.AssignReply, error) {
 	start := time.Now()
 	instanceId := uuid.New().String()
@@ -95,6 +131,17 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	// check if there is idle instance
 	if reply, err := s.idleUseInstance(request); err == nil {
 		return reply, nil
+	}
+
+	s.mu.Lock()
+	s.request_num++
+	if s.request_num < s.parallel_num {
+		s.mu.Unlock()
+		for i := int64(0); i < s.parallelism; i++ {
+			go s.preWarmInstance()
+		}
+	} else {
+		s.mu.Unlock()
 	}
 
 	// create new instance
@@ -140,8 +187,14 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 
 	// add instance to instances map
 	s.mu.Lock()
+	s.request_num++
 	instance.Busy = true
 	s.instances[instance.Id] = instance
+	if s.request_num < s.parallel_num {
+		for i := int64(0); i < s.parallelism; i++ {
+			go s.preWarmInstance()
+		}
+	}
 	s.mu.Unlock()
 	log.Printf("Assign request id: %s, instance %s created for app %s, init latency: %dms", request.RequestId, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
 
@@ -223,109 +276,29 @@ func (s *Scheduler) deleteSlot(ctx context.Context, requestId, slotId, instanceI
 	}
 }
 
-// func (s *Scheduler) gcLoop() {
-// 	log.Printf("gc loop for app: %s is started", s.metaData.Key)
-// 	ticker := time.NewTicker(s.config.GcInterval)
-
-// 	count := 0
-// 	var lastRequestNum uint64 = s.requestNum
-// 	for range ticker.C {
-// 		count++
-// 		for {
-// 			s.mu.Lock()
-// 			if s.deleteAll {
-// 				// prevent high source usage from bursty but little requests
-// 				reason := fmt.Sprintf("delete all idle instances for app %s", s.metaData.Key)
-// 				for element := s.idleInstance.Front(); element != nil; element = element.Next() {
-// 					instance := element.Value.(*model.Instance)
-// 					s.idleInstance.Remove(element)
-// 					delete(s.instances, instance.Id)
-// 					go func() {
-// 						defer s.wg.Done()
-// 						ctx := context.Background()
-// 						ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-// 						defer cancel()
-// 						s.deleteSlot(ctx, uuid.NewString(), instance.Slot.Id, instance.Id, instance.Meta.Key, reason)
-// 					}()
-// 				}
-// 				s.deleteAll = false
-// 			}
-// 			// check if last request is too old delete all idle instances
-// 			if count == 50 {
-// 				count = 0
-// 				// set a random number between 1 and idleInstance.Len() as the number of idle instances to be deleted
-// 				var num int = s.idleInstance.Len()
-// 				if s.idleInstance.Len() > 0 {
-// 					// cannot make num equal to idleInstance.Len(), do not delete all idle instances
-// 					for num == s.idleInstance.Len() {
-// 						// set random seed
-// 						// rand.Seed(time.Now().UnixNano())
-// 						rand.Seed(time.Now().UnixNano())
-// 						num = rand.Intn(s.idleInstance.Len()) + 1
-// 					}
-// 				}
-// 				if s.requestNum == lastRequestNum && s.idleInstance.Len() > 0 && num != s.idleInstance.Len() {
-// 					// fmt.Printf("request type %s num is not changed, delete %d idle instances\n", s.metaData.Key, num)
-// 					for element := s.idleInstance.Front(); element != nil; element = element.Next() {
-// 						if num == 0 {
-// 							break
-// 						}
-// 						instance := element.Value.(*model.Instance)
-// 						s.idleInstance.Remove(element)
-// 						delete(s.instances, instance.Id)
-
-// 						s.wg.Add(1)
-// 						go func() {
-// 							defer s.wg.Done()
-// 							ctx := context.Background()
-// 							ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-// 							defer cancel()
-// 							s.deleteSlot(ctx, uuid.NewString(), instance.Slot.Id, instance.Id, instance.Meta.Key, "pick random num to delete idle instances")
-// 						}()
-// 						num--
-// 					}
-// 					break
-// 				}
-// 				lastRequestNum = s.requestNum
-// 			}
-
-// 			for element := s.idleInstance.Front(); element != nil; element = element.Next() {
-// 				instance := element.Value.(*model.Instance)
-// 				idleDuration := time.Since(instance.LastIdleTime)
-// 				if idleDuration > s.config.IdleDurationBeforeGC {
-// 					// start to remove idle instance
-// 					s.idleInstance.Remove(element)
-// 					delete(s.instances, instance.Id)
-// 					// s.mu.Unlock()
-// 					s.wg.Add(1)
-// 					go func() {
-// 						defer s.wg.Done()
-// 						reason := fmt.Sprintf("idle duration %fs exceeds threshold %fs", idleDuration.Seconds(), s.config.IdleDurationBeforeGC.Seconds())
-// 						ctx := context.Background()
-// 						ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-// 						defer cancel()
-// 						s.deleteSlot(ctx, uuid.NewString(), instance.Slot.Id, instance.Id, instance.Meta.Key, reason)
-// 					}()
-// 				} else {
-// 					continue
-// 				}
-// 			}
-// 			s.mu.Unlock()
-// 			break
-// 		}
-// 	}
-// }
-
 func (s *Scheduler) policyLoop() {
-	log.Printf("gc loop for app: %s is started", s.metaData.Key)
-	ticker := time.NewTicker(s.config.GcInterval)
+	log.Printf("policy loop for app: %s is started", s.metaData.Key)
+
+	var ticker *time.Ticker
+	var pre = false
+	if s.pre_warm_window > 0 {
+		ticker = time.NewTicker(time.Duration(s.pre_warm_window*8/10) * time.Millisecond)
+		pre = true
+	} else {
+		ticker = time.NewTicker(s.config.GcInterval)
+	}
+
 	for range ticker.C {
+		// create new instance
+		if pre {
+			go s.preWarmInstance()
+		}
 		for {
 			s.mu.Lock()
 			if element := s.idleInstance.Back(); element != nil {
 				instance := element.Value.(*model.Instance)
 				idleDuration := time.Since(instance.LastIdleTime).Milliseconds()
-				if idleDuration >= s.keep_alive_window {
+				if idleDuration >= s.keep_alive_window*6/5 {
 					// start to remove idle instance
 					s.idleInstance.Remove(element)
 					delete(s.instances, instance.Id)
