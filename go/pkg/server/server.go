@@ -16,6 +16,7 @@ package server
 import (
 	"context"
 	"fmt"
+
 	"github.com/AliyunContainerService/scaler/go/pkg/config"
 	"github.com/AliyunContainerService/scaler/go/pkg/manager"
 	"github.com/AliyunContainerService/scaler/go/pkg/model"
@@ -43,8 +44,9 @@ func (s *Server) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.Ass
 	}
 	metaData := &model.Meta{
 		Meta: pb.Meta{
-			Key:           request.MetaData.Key,
-			Runtime:       request.MetaData.Runtime,
+			Key:     request.MetaData.Key,
+			Runtime: request.MetaData.Runtime,
+			// MemoryInMb:    request.MetaData.MemoryInMb,
 			TimeoutInSecs: request.MetaData.TimeoutInSecs,
 		},
 	}

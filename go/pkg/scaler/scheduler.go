@@ -55,7 +55,7 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 		parallelism:       int64(PolicyMap[metaData.Key]["parallel_strengthen"]),
 	}
 
-	log.Printf("New scaler for app: %s is created", metaData.Key)
+	log.Printf("New scaler for app: %s is created, memory size: %d", metaData.Key, metaData.MemoryInMb)
 	scheduler.wg.Add(1)
 	go func() {
 		defer scheduler.wg.Done()
@@ -88,29 +88,34 @@ func (s *Scheduler) idleUseInstance(request *pb.AssignRequest) (*pb.AssignReply,
 	return nil, errors.New("no idle instance")
 }
 
-func (s *Scheduler) preWarmInstance() {
+func (s *Scheduler) preWarmInstance(request *pb.AssignRequest) {
+	requestId := request.RequestId
+	instanceId := uuid.NewString()
+
 	resourceConfig := &model.SlotResourceConfig{
 		ResourceConfig: pb.ResourceConfig{
-			MemoryInMegabytes: s.metaData.MemoryInMb,
+			MemoryInMegabytes: request.MetaData.MemoryInMb,
 		},
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
 	defer cancel()
-	slot, err := s.platformClient.CreateSlot(ctx, uuid.NewString(), resourceConfig)
+	slot, err := s.platformClient.CreateSlot(ctx, requestId, resourceConfig)
 	if err != nil {
 		log.Printf("Pre warm instance, create slot error: %s", err.Error())
+		return
 	}
 	meta := &model.Meta{
 		Meta: pb.Meta{
-			Key:           s.metaData.Key,
-			Runtime:       s.metaData.Runtime,
-			TimeoutInSecs: s.metaData.TimeoutInSecs,
+			Key:           request.MetaData.Key,
+			Runtime:       request.MetaData.Runtime,
+			TimeoutInSecs: request.MetaData.TimeoutInSecs,
 		},
 	}
-	instance, err := s.platformClient.Init(ctx, uuid.NewString(), uuid.NewString(), slot, meta)
+	instance, err := s.platformClient.Init(ctx, requestId, instanceId, slot, meta)
 	if err != nil {
 		errorMessage := fmt.Sprintf("Pre warm instance, init instance error: %s", err.Error())
 		log.Printf(errorMessage)
+		return
 	}
 	s.mu.Lock()
 	s.instances[instance.Id] = instance
@@ -128,20 +133,20 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 
 	log.Printf("Assign request id: %s", request.RequestId)
 
-	// check if there is idle instance
-	if reply, err := s.idleUseInstance(request); err == nil {
-		return reply, nil
-	}
-
 	s.mu.Lock()
 	s.request_num++
 	if s.request_num < s.parallel_num {
 		s.mu.Unlock()
 		for i := int64(0); i < s.parallelism; i++ {
-			go s.preWarmInstance()
+			go s.preWarmInstance(request)
 		}
 	} else {
 		s.mu.Unlock()
+	}
+
+	// check if there is idle instance
+	if reply, err := s.idleUseInstance(request); err == nil {
+		return reply, nil
 	}
 
 	// create new instance
@@ -150,11 +155,7 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 			MemoryInMegabytes: request.MetaData.MemoryInMb,
 		},
 	}
-	create_start := time.Now().UnixMilli()
 	slot, err := s.platformClient.CreateSlot(ctx, request.RequestId, resourceConfig)
-	create_end := time.Now().UnixMilli()
-	create_slot := create_end - create_start
-	log.Printf("create slot %s cost: %dms for memory size: %dMb", slot.Id, create_slot, request.MetaData.MemoryInMb)
 	if err != nil {
 		errorMessage := fmt.Sprintf("create slot failed with: %s", err.Error())
 		log.Printf(errorMessage)
@@ -187,14 +188,8 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 
 	// add instance to instances map
 	s.mu.Lock()
-	s.request_num++
 	instance.Busy = true
 	s.instances[instance.Id] = instance
-	if s.request_num < s.parallel_num {
-		for i := int64(0); i < s.parallelism; i++ {
-			go s.preWarmInstance()
-		}
-	}
 	s.mu.Unlock()
 	log.Printf("Assign request id: %s, instance %s created for app %s, init latency: %dms", request.RequestId, instance.Id, request.MetaData.Key, instance.InitDurationInMs)
 
@@ -269,7 +264,7 @@ func (s *Scheduler) deleteSlot(ctx context.Context, requestId, slotId, instanceI
 	if slotId == "" {
 		return
 	}
-	log.Printf("request id %s, delete slot %s, instance %s, reason: %s", requestId, slotId, instanceId, reason)
+	// log.Printf("request id %s, delete slot %s, instance %s, reason: %s", requestId, slotId, instanceId, reason)
 	err := s.platformClient.DestroySLot(ctx, requestId, slotId, reason)
 	if err != nil {
 		log.Printf("request id %s, delete instance %s (Slot %s) for app %s error: %s", requestId, instanceId, slotId, metaKey, err.Error())
@@ -280,19 +275,19 @@ func (s *Scheduler) policyLoop() {
 	log.Printf("policy loop for app: %s is started", s.metaData.Key)
 
 	var ticker *time.Ticker
-	var pre = false
+	// var pre = false
 	if s.pre_warm_window > 0 {
 		ticker = time.NewTicker(time.Duration(s.pre_warm_window*8/10) * time.Millisecond)
-		pre = true
+		// pre = true
 	} else {
 		ticker = time.NewTicker(s.config.GcInterval)
 	}
 
 	for range ticker.C {
 		// create new instance
-		if pre {
-			go s.preWarmInstance()
-		}
+		// if pre {
+		// 	s.preWarmInstance()
+		// }
 		for {
 			s.mu.Lock()
 			if element := s.idleInstance.Back(); element != nil {
