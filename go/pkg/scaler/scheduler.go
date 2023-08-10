@@ -22,6 +22,7 @@ import (
 type Scheduler struct {
 	config            *config.Config
 	metaData          *model.Meta
+	memoryInMb        uint64
 	platformClient    platform_client.Client
 	mu                sync.Mutex
 	wg                sync.WaitGroup
@@ -43,6 +44,7 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 	scheduler := &Scheduler{
 		config:            config,
 		metaData:          metaData,
+		memoryInMb:        0,
 		platformClient:    client,
 		mu:                sync.Mutex{},
 		wg:                sync.WaitGroup{},
@@ -115,6 +117,10 @@ func (s *Scheduler) preWarmInstance(request *pb.AssignRequest) {
 	if err != nil {
 		errorMessage := fmt.Sprintf("Pre warm instance, init instance error: %s", err.Error())
 		log.Printf(errorMessage)
+		err_2 := s.platformClient.DestroySLot(ctx, requestId, slot.Id, "init instance error")
+		if err_2 != nil {
+			log.Printf("Pre warm instance, destroy slot error: %s", err_2.Error())
+		}
 		return
 	}
 	s.mu.Lock()
@@ -135,13 +141,12 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 
 	s.mu.Lock()
 	s.request_num++
-	if s.request_num < s.parallel_num {
+	if s.idleInstance.Len() < int(s.parallel_num)*int(s.parallelism) {
+		ceil := 10
 		s.mu.Unlock()
-		for i := int64(0); i < s.parallelism; i++ {
+		for i := int64(0); i < int64(ceil); i++ {
 			go s.preWarmInstance(request)
 		}
-	} else {
-		s.mu.Unlock()
 	}
 
 	// check if there is idle instance
@@ -275,25 +280,66 @@ func (s *Scheduler) policyLoop() {
 	log.Printf("policy loop for app: %s is started", s.metaData.Key)
 
 	var ticker *time.Ticker
-	// var pre = false
+	var idleDurationThreshold time.Duration
+	var pre = false
 	if s.pre_warm_window > 0 {
 		ticker = time.NewTicker(time.Duration(s.pre_warm_window*8/10) * time.Millisecond)
-		// pre = true
+		idleDurationThreshold = time.Duration(s.pre_warm_window*6/5) * time.Millisecond
+		pre = true
 	} else {
 		ticker = time.NewTicker(s.config.GcInterval)
+		idleDurationThreshold = s.config.IdleDurationBeforeGC
 	}
 
 	for range ticker.C {
 		// create new instance
-		// if pre {
-		// 	s.preWarmInstance()
-		// }
+		if pre {
+			s.preWarmInstance()
+		}
 		for {
 			s.mu.Lock()
 			if element := s.idleInstance.Back(); element != nil {
 				instance := element.Value.(*model.Instance)
-				idleDuration := time.Since(instance.LastIdleTime).Milliseconds()
-				if idleDuration >= s.keep_alive_window*6/5 {
+				idleDuration := time.Since(instance.LastIdleTime)
+				if idleDuration >= idleDurationThreshold {
+					// start to remove idle instance
+					s.idleInstance.Remove(element)
+					delete(s.instances, instance.Id)
+					s.mu.Unlock()
+					s.wg.Add(1)
+					go func() {
+						defer s.wg.Done()
+						reason := fmt.Sprintf("idle duration %dms exceeds threshold %dms", idleDuration, s.keep_alive_window)
+						ctx := context.Background()
+						ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+						defer cancel()
+						s.deleteSlot(ctx, uuid.NewString(), instance.Slot.Id, instance.Id, instance.Meta.Key, reason)
+					}()
+					continue
+				}
+			}
+			s.mu.Unlock()
+			break
+		}
+	}
+}
+
+func (s *Scheduler) policyLoop_3() {
+	log.Printf("policy loop for app: %s is started", s.metaData.Key)
+	ticker := time.NewTicker(s.config.GcInterval)
+	var idleDurationThreshold time.Duration
+	if s.keep_alive_window == 0 {
+		idleDurationThreshold = s.config.IdleDurationBeforeGC
+	} else {
+		idleDurationThreshold = time.Duration(s.keep_alive_window) * time.Millisecond
+	}
+	for range ticker.C {
+		for {
+			s.mu.Lock()
+			if element := s.idleInstance.Back(); element != nil {
+				instance := element.Value.(*model.Instance)
+				idleDuration := time.Since(instance.LastIdleTime)
+				if idleDuration >= idleDurationThreshold {
 					// start to remove idle instance
 					s.idleInstance.Remove(element)
 					delete(s.instances, instance.Id)

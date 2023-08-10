@@ -153,13 +153,20 @@ def parallel_requests(requests):
         v.sort(key=lambda x: x.startTime_)
         i = 0
         while i < len(v)-1:
-            for j in range(i+1, len(v)):
+            j = i+1
+            while j < len(v):
                 if v[j].startTime_ - v[i].startTime_ > initTime + create_slot:
                     parallel_cluster.append(j - i)
                     i = j
                     break
-            i += 1
+                j += 1
+            if j == len(v):
+                break
         parallel_cluster.append(len(v) - i)
+
+        if k == "8c0fe750d52bec4d349e5fe14a4b531c49705b10":
+            print("i: ", i)
+            print(parallel_cluster)
 
         max_parallel = max(parallel_cluster)
         if max_parallel < 0:
@@ -213,11 +220,15 @@ if __name__ == '__main__':
     policy = parse_requests(data["requests"])
     parallelism = parallel_requests(data["requests"])
     for k, _ in policy.items():
-        policy[k]["max_parallel_index"] = parallelism[k]["max_parallel_index"]
-        policy[k]["parallel_strengthen"] = parallelism[k]["parallel_strengthen"]
+        if policy[k]["pre_warm_window"] == 0 and policy[k]["keep_alive_window"] == 0:
+            policy[k]["max_parallel_index"] = parallelism[k]["parallel_strengthen"]
+            policy[k]["parallel_strengthen"] = parallelism[k]["max_parallel_index"]
+        else:
+            policy[k]["max_parallel_index"] = parallelism[k]["max_parallel_index"]
+            policy[k]["parallel_strengthen"] = parallelism[k]["parallel_strengthen"]
 
-    json_name = sys.argv[1].split("/")[-1]
-    json_name += ".json"
-    print(json_name)
-    with open(json_name, "w") as f:
-        json.dump(policy, f, indent=4)
+    # json_name = sys.argv[1].split("/")[-1]
+    # json_name += ".json"
+    # print(json_name)
+    # with open(json_name, "w") as f:
+    #     json.dump(policy, f, indent=4)

@@ -1,22 +1,32 @@
 {
     "nodes2": {
         "pre_warm_window": 183,
-        "keep_alive_window": 29857
+        "keep_alive_window": 29857,
+        "max_parallel_index": 2477,
+        "parallel_strengthen": 1
     },
     "roles2": {
         "pre_warm_window": 57,
-        "keep_alive_window": 5124
+        "keep_alive_window": 5124,
+        "max_parallel_index": 357665,
+        "parallel_strengthen": 1
     },
     "rolebindings2": {
         "pre_warm_window": 14,
-        "keep_alive_window": 2031
+        "keep_alive_window": 2031,
+        "max_parallel_index": 350917,
+        "parallel_strengthen": 1
     },
     "certificatesigningrequests2": {
         "pre_warm_window": 21,
-        "keep_alive_window": 2995
+        "keep_alive_window": 2995,
+        "max_parallel_index": 24158,
+        "parallel_strengthen": 1
     },
     "binding2": {
         "pre_warm_window": 49,
-        "keep_alive_window": 12238
+        "keep_alive_window": 12238,
+        "max_parallel_index": 309506,
+        "parallel_strengthen": 1
     }
 }

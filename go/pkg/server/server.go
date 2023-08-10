@@ -44,9 +44,8 @@ func (s *Server) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.Ass
 	}
 	metaData := &model.Meta{
 		Meta: pb.Meta{
-			Key:     request.MetaData.Key,
-			Runtime: request.MetaData.Runtime,
-			// MemoryInMb:    request.MetaData.MemoryInMb,
+			Key:           request.MetaData.Key,
+			Runtime:       request.MetaData.Runtime,
 			TimeoutInSecs: request.MetaData.TimeoutInSecs,
 		},
 	}
