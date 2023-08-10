@@ -62,7 +62,11 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 	go func() {
 		defer scheduler.wg.Done()
 		// scheduler.gcLoop()
-		scheduler.policyLoop()
+		if len(metaData.Key) > 27 {
+			scheduler.policyLoop_3()
+		} else {
+			scheduler.policyLoop()
+		}
 		log.Printf("gc loop for app: %s is started", metaData.Key)
 	}()
 	return scheduler
@@ -142,7 +146,6 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	s.mu.Lock()
 	s.request_num++
 	s.memoryInMb = request.MetaData.MemoryInMb
-
 	if len(s.metaData.Key) > 27 {
 		if s.idleInstance.Len() < int(s.parallel_num)*int(s.parallelism) {
 			ceil := 10
@@ -150,8 +153,18 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 			for i := int64(0); i < int64(ceil); i++ {
 				go s.preWarmInstance(request)
 			}
+		} else {
+			s.mu.Unlock()
 		}
 	} else {
+		if s.request_num < s.parallel_num {
+			s.mu.Unlock()
+			for i := int64(0); i < s.parallelism; i++ {
+				go s.preWarmInstance(request)
+			}
+		} else {
+			s.mu.Unlock()
+		}
 	}
 
 	// check if there is idle instance
@@ -298,8 +311,16 @@ func (s *Scheduler) policyLoop() {
 
 	for range ticker.C {
 		// create new instance
-		if pre {
-			s.preWarmInstance()
+		if pre && s.memoryInMb > 0 {
+			s.preWarmInstance(&pb.AssignRequest{
+				RequestId: uuid.NewString(),
+				Timestamp: uint64(time.Now().UnixMilli()),
+				MetaData: &pb.Meta{
+					Key:           s.metaData.Key,
+					Runtime:       s.metaData.Runtime,
+					TimeoutInSecs: s.metaData.TimeoutInSecs,
+					MemoryInMb:    s.memoryInMb},
+			})
 		}
 		for {
 			s.mu.Lock()
