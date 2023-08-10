@@ -141,12 +141,17 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 
 	s.mu.Lock()
 	s.request_num++
-	if s.idleInstance.Len() < int(s.parallel_num)*int(s.parallelism) {
-		ceil := 10
-		s.mu.Unlock()
-		for i := int64(0); i < int64(ceil); i++ {
-			go s.preWarmInstance(request)
+	s.memoryInMb = request.MetaData.MemoryInMb
+
+	if len(s.metaData.Key) > 27 {
+		if s.idleInstance.Len() < int(s.parallel_num)*int(s.parallelism) {
+			ceil := 10
+			s.mu.Unlock()
+			for i := int64(0); i < int64(ceil); i++ {
+				go s.preWarmInstance(request)
+			}
 		}
+	} else {
 	}
 
 	// check if there is idle instance
