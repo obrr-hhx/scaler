@@ -22,7 +22,7 @@ import (
 type Scheduler struct {
 	config            *config.Config
 	metaData          *model.Meta
-	memoryInMb        uint64
+	lastRequest       *pb.AssignRequest
 	platformClient    platform_client.Client
 	mu                sync.Mutex
 	wg                sync.WaitGroup
@@ -44,7 +44,7 @@ func New(metaData *model.Meta, config *config.Config) Scaler {
 	scheduler := &Scheduler{
 		config:            config,
 		metaData:          metaData,
-		memoryInMb:        0,
+		lastRequest:       &pb.AssignRequest{},
 		platformClient:    client,
 		mu:                sync.Mutex{},
 		wg:                sync.WaitGroup{},
@@ -94,6 +94,48 @@ func (s *Scheduler) idleUseInstance(request *pb.AssignRequest) (*pb.AssignReply,
 	return nil, errors.New("no idle instance")
 }
 
+func (s *Scheduler) preWarmInstanceWithoutReq() {
+	request := s.lastRequest
+	requestId := request.RequestId
+	instanceId := uuid.NewString()
+
+	resourceConfig := &model.SlotResourceConfig{
+		ResourceConfig: pb.ResourceConfig{
+			MemoryInMegabytes: request.MetaData.MemoryInMb,
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Second)
+	defer cancel()
+	slot, err := s.platformClient.CreateSlot(ctx, requestId, resourceConfig)
+	if err != nil {
+		log.Printf("Pre warm instance, create slot error: %s", err.Error())
+		return
+	}
+	meta := &model.Meta{
+		Meta: pb.Meta{
+			Key:           request.MetaData.Key,
+			Runtime:       request.MetaData.Runtime,
+			TimeoutInSecs: request.MetaData.TimeoutInSecs,
+		},
+	}
+	instance, err := s.platformClient.Init(ctx, requestId, instanceId, slot, meta)
+	if err != nil {
+		errorMessage := fmt.Sprintf("Pre warm instance, init instance error: %s", err.Error())
+		log.Printf(errorMessage)
+		err = s.platformClient.DestroySLot(ctx, requestId, slot.Id, "init instance error")
+		if err != nil {
+			log.Printf("Pre warm instance, destroy slot error: %s", err.Error())
+		}
+		return
+	}
+
+	s.mu.Lock()
+	s.instances[instance.Id] = instance
+	s.idleInstance.PushFront(instance)
+	s.mu.Unlock()
+}
+
 func (s *Scheduler) preWarmInstance(request *pb.AssignRequest) {
 	requestId := request.RequestId
 	instanceId := uuid.NewString()
@@ -138,20 +180,21 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 	instanceId := uuid.New().String()
 
 	defer func() {
-		log.Printf("Assign cost: %s", time.Since(start))
+		log.Printf("Assign request id: %s, Assign cost: %s", request.RequestId, time.Since(start))
 	}()
-
-	log.Printf("Assign request id: %s", request.RequestId)
-
 	s.mu.Lock()
 	s.request_num++
-	s.memoryInMb = request.MetaData.MemoryInMb
-	if len(s.metaData.Key) > 27 {
-		if s.idleInstance.Len() < int(s.parallel_num)*int(s.parallelism) {
-			ceil := 10
-			s.mu.Unlock()
-			for i := int64(0); i < int64(ceil); i++ {
-				go s.preWarmInstance(request)
+	s.lastRequest = request
+	if len(s.metaData.Key) > 28 {
+		if s.pre_warm_window < 10000 {
+			if s.idleInstance.Len() < 50000 {
+				ceil := 20
+				s.mu.Unlock()
+				for i := int64(0); i < int64(ceil); i++ {
+					go s.preWarmInstance(request)
+				}
+			} else {
+				s.mu.Unlock()
 			}
 		} else {
 			s.mu.Unlock()
@@ -165,6 +208,19 @@ func (s *Scheduler) Assign(ctx context.Context, request *pb.AssignRequest) (*pb.
 		} else {
 			s.mu.Unlock()
 		}
+		// if s.pre_warm_window < 500 {
+		// 	if s.idleInstance.Len() < 50000 {
+		// 		ceil := 20
+		// 		s.mu.Unlock()
+		// 		for i := int64(0); i < int64(ceil); i++ {
+		// 			go s.preWarmInstance(request)
+		// 		}
+		// 	} else {
+		// 		s.mu.Unlock()
+		// 	}
+		// } else {
+		// 	s.mu.Unlock()
+		// }
 	}
 
 	// check if there is idle instance
@@ -299,10 +355,10 @@ func (s *Scheduler) policyLoop() {
 
 	var ticker *time.Ticker
 	var idleDurationThreshold time.Duration
-	var pre = false
+	var pre bool = false
 	if s.pre_warm_window > 0 {
 		ticker = time.NewTicker(time.Duration(s.pre_warm_window*8/10) * time.Millisecond)
-		idleDurationThreshold = time.Duration(s.pre_warm_window*6/5) * time.Millisecond
+		idleDurationThreshold = time.Duration(s.keep_alive_window*6/5) * time.Millisecond
 		pre = true
 	} else {
 		ticker = time.NewTicker(s.config.GcInterval)
@@ -310,17 +366,8 @@ func (s *Scheduler) policyLoop() {
 	}
 
 	for range ticker.C {
-		// create new instance
-		if pre && s.memoryInMb > 0 {
-			s.preWarmInstance(&pb.AssignRequest{
-				RequestId: uuid.NewString(),
-				Timestamp: uint64(time.Now().UnixMilli()),
-				MetaData: &pb.Meta{
-					Key:           s.metaData.Key,
-					Runtime:       s.metaData.Runtime,
-					TimeoutInSecs: s.metaData.TimeoutInSecs,
-					MemoryInMb:    s.memoryInMb},
-			})
+		if pre && s.lastRequest != nil {
+			go s.preWarmInstanceWithoutReq()
 		}
 		for {
 			s.mu.Lock()
